@@ -1,0 +1,658 @@
+{
+    "info": {
+        "name": "SudhvedaHoney Backend API",
+        "description": "Postman collection for SudhvedaHoney user authentication APIs",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string"
+        },
+        {
+            "key": "verificationId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "addressId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "productId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "imageId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "variantId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "reviewId",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        ""
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Create User / Send OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"John Doe\",\n  \"mobile\": \"+919999999999\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/create",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "create"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify OTP (Registration)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verificationId\": \"{{verificationId}}\",\n  \"otp\": \"1234\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/verify-otp",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "verify-otp"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login User / Send OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"mobile\": \"+919999999999\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "login"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify Login OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verificationId\": \"{{verificationId}}\",\n  \"otp\": \"1234\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/verify-login-otp",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "verify-login-otp"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Addresses",
+            "item": [
+                {
+                    "name": "Add User Address",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"full_name\": \"John Doe\",\n  \"phone\": \"+919999999999\",\n  \"address_line1\": \"123 Main Street\",\n  \"address_line2\": \"Near Market\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400001\",\n  \"country\": \"India\",\n  \"address_type\": \"Home\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/addresses/add",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "addresses",
+                                "add"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All User Addresses",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/addresses/all",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "addresses",
+                                "all"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update User Address",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"full_name\": \"John Doe\",\n  \"phone\": \"+919999999999\",\n  \"address_line1\": \"456 Updated Street\",\n  \"address_line2\": \"Near Park\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"pincode\": \"400002\",\n  \"country\": \"India\",\n  \"address_type\": \"Office\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/addresses/update/{{addressId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "addresses",
+                                "update",
+                                "{{addressId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete User Address",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/addresses/delete/{{addressId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "addresses",
+                                "delete",
+                                "{{addressId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Cart",
+            "item": [
+                {
+                    "name": "Get Cart",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                ""
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add to Cart",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"productId\": \"product-id-here\",\n  \"quantity\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/add",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "add"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove from Cart",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"productId\": \"product-id-here\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/remove",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "remove"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Products",
+            "item": [
+                {
+                    "name": "Create Product",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"product_name\": \"Honey 250g\",\n  \"slug\": \"honey-250g\",\n  \"flavor\": \"Natural\",\n  \"description\": \"Pure honey\",\n  \"manufacturer_information\": \"Sudhveda Foods\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Products",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Product By ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/{{productId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "{{productId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Upload Product Images",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "images",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/images",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "{{productId}}",
+                                "images"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Product Variant",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 10,\n  \"sku\": \"SKU123\",\n  \"price\": 199.99,\n  \"mrp\": 249.99,\n  \"discount\": 20\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "{{productId}}",
+                                "variants"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product Image",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "image",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/images/{{imageId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "{{productId}}",
+                                "images",
+                                "{{imageId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Product Variant",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"quantity\": 15,\n  \"sku\": \"SKU123-UPDATED\",\n  \"price\": 219.99,\n  \"mrp\": 269.99,\n  \"discount\": 25\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "{{productId}}",
+                                "variants",
+                                "{{variantId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Product Reviews",
+            "item": [
+                {
+                    "name": "Create Product Review",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"rating\": 5,\n  \"review\": \"Excellent product\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/reviews/reviews",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reviews",
+                                "reviews"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Product Review",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/reviews/reviews/{{reviewId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reviews",
+                                "reviews",
+                                "{{reviewId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ]
+}
