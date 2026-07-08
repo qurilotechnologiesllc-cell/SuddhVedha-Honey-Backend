@@ -30,38 +30,108 @@ const handleDuplicateKeyError = (error) => {
 };
 
 const normalizeError = (error) => {
-  if (error instanceof AppError) {
-    return error;
+
+  // Mongoose Validation Error
+  if (error.name === 'ValidationError') {
+    const details = Object.values(error.errors).map(err => ({
+      field: err.path,
+      message: err.message
+    }))
+    return {
+      name: 'ValidationError',
+      statusCode: 400,
+      status: 'fail',
+      message: 'Validation failed',
+      details,
+      stack: error.stack
+    }
   }
 
-  if (error.name === 'ValidationError' && error.errors) {
-    return handleMongooseValidationError(error);
-  }
-
-  if (error.name === 'CastError') {
-    return handleMongooseCastError(error);
-  }
-
+  // Mongoose Duplicate Key Error
   if (error.code === 11000) {
-    return handleDuplicateKeyError(error);
+    const field = Object.keys(error.keyValue)[0]
+    const value = error.keyValue[field]
+    return {
+      name: 'DuplicateKeyError',
+      statusCode: 409,
+      status: 'fail',
+      message: `${field}: "${value}" already exists`,
+      stack: error.stack
+    }
   }
 
-  if (error.type === 'entity.parse.failed') {
-    return new BadRequestError('Invalid JSON format in request body.');
+  // Mongoose CastError (Invalid ObjectId)
+  if (error.name === 'CastError') {
+    return {
+      name: 'CastError',
+      statusCode: 400,
+      status: 'fail',
+      message: `Invalid ${error.path}: ${error.value}`,
+      stack: error.stack
+    }
   }
 
-  return new AppError(
-    isDevelopment ? error.message : 'Something went wrong on the server.',
-    HTTP_STATUS.INTERNAL_SERVER_ERROR
-  );
-};
+  // JWT Errors
+  if (error.name === 'JsonWebTokenError') {
+    return {
+      name: 'JsonWebTokenError',
+      statusCode: 401,
+      status: 'fail',
+      message: 'Invalid token. Please login again',
+      stack: error.stack
+    }
+  }
+
+  if (error.name === 'TokenExpiredError') {
+    return {
+      name: 'TokenExpiredError',
+      statusCode: 401,
+      status: 'fail',
+      message: 'Token expired. Please login again',
+      stack: error.stack
+    }
+  }
+
+  // Operational Errors (apne banaye hue)
+  if (error.isOperational) {
+    return {
+      name: error.name,
+      statusCode: error.statusCode,
+      status: error.status,
+      message: error.message,
+      details: error.details,
+      stack: error.stack
+    }
+  }
+
+  // Unknown/Unexpected Errors
+  // Development mein actual error dikhao!
+  return {
+    name: error.name || 'UnknownError',
+    statusCode: 500,
+    status: 'error',
+    message: isDevelopment
+      ? error.message  // ← Actual error dikhega!
+      : 'Something went wrong on the server',
+    stack: error.stack
+  }
+}
 
 const notFoundHandler = (req, res, next) => {
   next(new NotFoundError(`Route ${req.originalUrl}`));
 };
 
+
 const errorHandler = (error, req, res, next) => {
-  const normalizedError = normalizeError(error);
+
+  // Terminal pe poora error print karo!
+  console.error('─────────────────────────────────')
+  console.error('❌ ERROR:', error.name)
+  console.error('📝 MESSAGE:', error.message)
+  console.error('📍 STACK:', error.stack)
+  console.error('─────────────────────────────────')
+
+  const normalizedError = normalizeError(error)
 
   const response = {
     success: false,
@@ -69,18 +139,20 @@ const errorHandler = (error, req, res, next) => {
     statusCode: normalizedError.statusCode,
     error: normalizedError.name,
     message: normalizedError.message,
-  };
+  }
 
   if (normalizedError.details) {
-    response.details = normalizedError.details;
+    response.details = normalizedError.details
   }
 
+  // Development mein stack trace bhi bhejo
   if (isDevelopment) {
-    response.stack = normalizedError.stack;
+    response.stack = normalizedError.stack
   }
 
-  res.status(normalizedError.statusCode).json(response);
-};
+  res.status(normalizedError.statusCode).json(response)
+}
+
 
 module.exports = {
   errorHandler,

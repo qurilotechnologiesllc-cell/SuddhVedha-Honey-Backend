@@ -17,7 +17,7 @@ This project provides the backend API for SudhvedaHoney user authentication.
 - Express.js
 - MongoDB with Mongoose
 - Redis
-- Twilio for OTP delivery
+- AutoBySMS for OTP delivery
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ Make sure the following services are available:
 
 - MongoDB
 - Redis
-- Twilio account credentials
+- AutoBySMS credentials (API key, sender ID, template ID)
 
 ## Environment Variables
 
@@ -36,9 +36,9 @@ PORT=3000
 MONGO_URI=your_mongodb_connection_string
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=your_jwt_secret
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=your_twilio_phone_number
+AUTOBYSMS_API_KEY=your_autobysms_api_key
+AUTOBYSMS_SENDER_ID=your_autobysms_sender_id
+AUTOBYSMS_TEMPLATE_ID=your_autobysms_template_id
 ```
 
 ## Installation
@@ -329,6 +329,36 @@ Response:
   }
 }
 ```
+
+## Wishlist Endpoints
+
+### 17) Get Wishlist
+
+- Method: GET
+- URL: `/api/wishlist`
+- Auth: Requires a valid logged-in user token/cookie
+
+### 18) Add Product to Wishlist
+
+- Method: POST
+- URL: `/api/wishlist/add/:productId`
+- Auth: Requires a valid logged-in user token/cookie
+- Path Param: `productId`
+
+### 19) Remove Product from Wishlist
+
+- Method: DELETE
+- URL: `/api/wishlist/remove/:productId`
+- Auth: Requires a valid logged-in user token/cookie
+- Path Param: `productId`
+
+## OTP Delivery
+
+OTP messages are sent using the AutoBySMS service through [src/utils/sendOtp.js](src/utils/sendOtp.js). The service uses:
+
+- `AUTOBYSMS_API_KEY`
+- `AUTOBYSMS_SENDER_ID`
+- `AUTOBYSMS_TEMPLATE_ID`
 
 ## Postman Collection
 

@@ -6,7 +6,7 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToC
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
 const createProduct = asyncHandler(async (req, res) => {
-    const { product_name, slug, flavor, description, manufacturer_information } = req.body
+    const { product_name, slug, flavor, description, manufacturer_information, categoryId } = req.body
 
     // Check if the product already exists
     const existingProduct = await Product.findOne({ slug })
@@ -14,13 +14,15 @@ const createProduct = asyncHandler(async (req, res) => {
         throw new ConflictError('Product with this slug already exists')
     }
 
+
     // Create the new product
     const product = await Product.create({
         product_name,
         slug,
         flavor,
         description,
-        manufacturer_information
+        manufacturer_information,
+        category: categoryId
     })
 
     res.status(201).json({
@@ -30,7 +32,7 @@ const createProduct = asyncHandler(async (req, res) => {
 })
 
 const getAllProducts = asyncHandler(async (req, res) => {
-    const products = await Product.find().populate('images').populate('variants').populate('reviews')
+    const products = await Product.find().populate('images').populate('variants').populate('reviews').populate('category')
 
     res.status(200).json({
         success: true,
@@ -41,7 +43,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
 const getProductById = asyncHandler(async (req, res) => {
     const { id } = req.params
 
-    const product = await Product.findById(id).populate('images').populate('variants').populate('reviews')
+    const product = await Product.findById(id).populate('images').populate('variants').populate('reviews').populate('category')
 
     if (!product) {
         throw new NotFoundError('Product not found')

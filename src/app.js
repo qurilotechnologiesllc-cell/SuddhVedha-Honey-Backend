@@ -8,6 +8,8 @@ const userAddressRoute = require('./routes/userAddressRoutes');
 const cartRoute = require('./routes/cartRoute');
 const productRoute = require('./routes/productsRoute');
 const reviewRoute = require('./routes/reviewRoute');
+const wishlistRoute = require('./routes/wishlistRoute');
+const categoryRoute = require('./routes/categoryRoute')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -28,6 +30,8 @@ app.use('/api/addresses', userAddressRoute);
 app.use('/api/cart', cartRoute);
 app.use('/api/products', productRoute);
 app.use('/api/reviews', reviewRoute);
+app.use('/api/wishlist', wishlistRoute);
+app.use('/api/category', categoryRoute)
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
 app.use(errorHandler);
