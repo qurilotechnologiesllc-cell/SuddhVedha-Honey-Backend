@@ -32,7 +32,16 @@ const createProduct = asyncHandler(async (req, res) => {
 })
 
 const getAllProducts = asyncHandler(async (req, res) => {
-    const products = await Product.find().populate('images').populate('variants').populate('reviews').populate('category')
+    const products = await Product.find({ is_active: true }).populate({
+        path: 'category',
+        select: 'category_name slug description -_id'
+    }).populate({
+        path: 'images',
+        select: 'image_url public_id  -_id'
+    }).populate({
+        path: 'variants',
+        select: 'price sku quantity mrp discount -_id'
+    }).populate('reviews')
 
     res.status(200).json({
         success: true,
@@ -43,7 +52,16 @@ const getAllProducts = asyncHandler(async (req, res) => {
 const getProductById = asyncHandler(async (req, res) => {
     const { id } = req.params
 
-    const product = await Product.findById(id).populate('images').populate('variants').populate('reviews').populate('category')
+    const product = await Product.findById(id).populate({
+        path: 'category',
+        select: 'category_name slug description -_id'
+    }).populate({
+        path: 'images',
+        select: 'image_url public_id  -_id'
+    }).populate({
+        path: 'variants',
+        select: 'price sku quantity mrp discount -_id'
+    }).populate('reviews')
 
     if (!product) {
         throw new NotFoundError('Product not found')
