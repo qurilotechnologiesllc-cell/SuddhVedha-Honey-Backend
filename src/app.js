@@ -12,6 +12,7 @@ const wishlistRoute = require('./routes/wishlistRoute');
 const categoryRoute = require('./routes/categoryRoute');
 const videoRoutes = require('./routes/videoRoute');
 const feedbackVideoRoutes = require('./routes/feedbackVideoRoute')
+const filterProductRoutes = require('./routes/filterProductRoute')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -36,6 +37,7 @@ app.use('/api/wishlist', wishlistRoute);
 app.use('/api/category', categoryRoute);
 app.use('/api/videos', videoRoutes);
 app.use('/api/feedback', feedbackVideoRoutes);
+app.use('/api/filter', filterProductRoutes)
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
 app.use(errorHandler);

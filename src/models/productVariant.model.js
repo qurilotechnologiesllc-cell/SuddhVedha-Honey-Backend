@@ -1,26 +1,22 @@
 const mongoose = require("mongoose");
 
-const ProductVariantSchema = new mongoose.Schema({
-
-    product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: true
-    },
+const VariantItemSchema = new mongoose.Schema({
 
     quantity: {
         type: String,
         enum: [
+            "100g",
             "250g",
             "500g",
             "1kg",
             "2kg"
-        ]
+        ],
+        required: true
     },
 
     sku: {
         type: String,
-        unique: true
+        required: true
     },
 
     price: {
@@ -38,9 +34,24 @@ const ProductVariantSchema = new mongoose.Schema({
         default: 0
     }
 
-},
-    {
-        timestamps: true
-    });
+}, { _id: false });
 
-module.exports = mongoose.model("ProductVariant", ProductVariantSchema);
+const ProductVariantSchema = new mongoose.Schema({
+
+    product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        unique: true,
+        required: true
+    },
+
+    variants: [VariantItemSchema]
+
+}, {
+    timestamps: true
+});
+
+module.exports = mongoose.model(
+    "ProductVariant",
+    ProductVariantSchema
+);

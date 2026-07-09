@@ -6,6 +6,6 @@ const { uploadProductVideo, getAllProductsVideo, removeProductVideo } = require(
 
 router.post('/upload/:productId', uploadVideo, uploadProductVideo);
 router.get('/:productId', getAllProductsVideo);
-router.delete('/:videoId', removeProductVideo)
+router.delete('/:productId/:videoId', removeProductVideo)
 
 module.exports = router

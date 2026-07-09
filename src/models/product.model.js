@@ -49,20 +49,20 @@ const ProductSchema = new mongoose.Schema(
             ref: 'Category'
         },
 
-        images: [{
+        images: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductImage"
-        }],
+        },
 
-        videos: [{
+        videos: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVideo"
-        }],
+        },
 
-        variants: [{
+        variants: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVariant"
-        }],
+        },
 
         reviews: [{
             type: mongoose.Schema.Types.ObjectId,

@@ -662,7 +662,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"quantity\": 10,\n  \"sku\": \"SKU123\",\n  \"price\": 199.99,\n  \"mrp\": 249.99,\n  \"discount\": 20\n}"
+                            "raw": "{\n  \"quantity\": \"100g\",\n  \"sku\": \"SKU123\",\n  \"price\": 199.99,\n  \"mrp\": 249.99,\n  \"discount\": 20\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
@@ -727,10 +727,10 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"quantity\": 15,\n  \"sku\": \"SKU123-UPDATED\",\n  \"price\": 219.99,\n  \"mrp\": 269.99,\n  \"discount\": 25\n}"
+                            "raw": "{\n  \"quantity\": \"200g\",\n  \"sku\": \"SKU123-UPDATED\",\n  \"price\": 219.99,\n  \"mrp\": 269.99,\n  \"discount\": 25\n}"
                         },
                         "url": {
-                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
                             "host": [
                                 "{{baseUrl}}"
                             ],
@@ -738,8 +738,7 @@
                                 "api",
                                 "products",
                                 "{{productId}}",
-                                "variants",
-                                "{{variantId}}"
+                                "variants"
                             ]
                         }
                     },
@@ -815,13 +814,14 @@
                             }
                         ],
                         "url": {
-                            "raw": "{{baseUrl}}/api/videos/{{videoId}}",
+                            "raw": "{{baseUrl}}/api/videos/{{productId}}/{{videoId}}",
                             "host": [
                                 "{{baseUrl}}"
                             ],
                             "path": [
                                 "api",
                                 "videos",
+                                "{{productId}}",
                                 "{{videoId}}"
                             ]
                         }
@@ -908,6 +908,31 @@
                                 "feedback",
                                 "remove-feedback",
                                 "{{videoId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Filter Products",
+            "item": [
+                {
+                    "name": "Filter Products by Category Slug",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/filter/category/honey",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "filter",
+                                "category",
+                                "honey"
                             ]
                         }
                     },

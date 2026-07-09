@@ -1,18 +1,10 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const ProductVideoSchema = new mongoose.Schema(
+const VideoSchema = new mongoose.Schema(
     {
-        product: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Product',
-            required: true,
-            index: true
-        },
-
         public_id: {
             type: String,
             required: true,
-            unique: true,
             trim: true
         },
 
@@ -29,8 +21,28 @@ const ProductVideoSchema = new mongoose.Schema(
         }
     },
     {
+        _id: true
+    }
+);
+
+const ProductVideoSchema = new mongoose.Schema(
+    {
+        product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            required: true,
+            unique: true,
+            index: true
+        },
+
+        videos: [VideoSchema]
+    },
+    {
         timestamps: true
     }
 );
 
-module.exports = mongoose.model('ProductVideo', ProductVideoSchema);
+module.exports = mongoose.model(
+    "ProductVideo",
+    ProductVideoSchema
+);

@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { createProduct, getAllProducts, getProductById, uploadProductImages, createProductVariant, updateProductimage, updateProductVariant } = require('../controllers/productController')
+const { createProduct, getAllProducts, getProductById, uploadProductImages, createProductVariant, updateProductImage, updateProductVariant } = require('../controllers/productController')
 const { uploadMultiple, uploadSingle } = require('../middlewares/upload.middleware')
 
 // Route to create a new product
@@ -19,10 +19,10 @@ router.post('/:id/images', uploadMultiple, uploadProductImages)
 router.post('/:id/variants', createProductVariant)
 
 // Route to update a product image
-router.put('/:productId/images/:imageId', uploadSingle, updateProductimage)
+router.put('/:productId/images/:imageId', uploadSingle, updateProductImage)
 
 // Route to update a product variant
-router.put('/:productId/variants/:variantId', updateProductVariant)
+router.put('/:productId/variants', updateProductVariant)
 
 
 module.exports = router

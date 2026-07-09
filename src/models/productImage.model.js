@@ -1,32 +1,44 @@
 const mongoose = require("mongoose");
 
-const ProductImageSchema = new mongoose.Schema({
+const ImageSchema = new mongoose.Schema(
+    {
+        public_id: {
+            type: String,
+            required: true,
+            trim: true
+        },
 
-    product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: true,
-        index: true
+        image_url: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        is_primary: {
+            type: Boolean,
+            default: false
+        }
     },
-
-    image_url: {
-        type: String,
-        required: true
-    },
-
-    public_id: {
-        type: String,
-        required: true
-    },
-
-    display_order: {
-        type: Number,
-        default: 1
+    {
+        _id: true
     }
+);
 
-},
+const ProductImageSchema = new mongoose.Schema(
+    {
+        product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            required: true,
+            unique: true,
+            index: true
+        },
+
+        images: [ImageSchema]
+    },
     {
         timestamps: true
-    });
+    }
+);
 
 module.exports = mongoose.model("ProductImage", ProductImageSchema);

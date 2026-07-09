@@ -32,194 +32,408 @@ const createProduct = asyncHandler(async (req, res) => {
 })
 
 const getAllProducts = asyncHandler(async (req, res) => {
-    const products = await Product.find({ is_active: true }).populate({
-        path: 'category',
-        select: 'category_name slug description -_id'
-    }).populate({
-        path: 'images',
-        select: 'image_url public_id  -_id'
-    }).populate({
-        path: 'variants',
-        select: 'price sku quantity mrp discount -_id'
-    }).populate({
-        path: 'reviews',
-        select: 'rating review -_id'
-    })
+    // 1. .lean() add kiya taaki hum data ko JS array ki tarah manipulate kar sakein
+    const products = await Product.find({ is_active: true })
+        .populate({
+            path: 'category',
+            select: 'category_name slug description -_id'
+        })
+        .populate({
+            path: 'images',
+            select: 'images -_id'
+        })
+        .populate({
+            path: 'variants',
+            select: 'variants -_id'
+        })
+        .populate({
+            path: 'reviews',
+            select: 'rating review -_id'
+        })
+        .lean(); // <-- Super Important!
+
+    // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li
+    const formattedProducts = products.map(product => {
+        let singleImage = null;
+        let singleVariant = null;
+
+        // Check kiya ki images object aur uske andar ka images array exist karta hai ya nahi
+        if (product.images && product.images.images && product.images.images.length > 0) {
+            singleImage = product.images.images; // Sirf pehla image object uthaya
+        }
+        // Variants array se 1st variant nikala
+        if (product.variants && product.variants.variants && product.variants.variants.length > 0) {
+            singleVariant = product.variants.variants;
+        }
+
+        return {
+            ...product,
+            images: singleImage, // Pura object hata kar sirf single image object set kar diya
+            variants: singleVariant
+        };
+    });
 
     res.status(200).json({
         success: true,
-        data: products
-    })
-})
+        data: formattedProducts // Modified data bheja
+    });
+});
 
 const getProductById = asyncHandler(async (req, res) => {
-    const { id } = req.params
+    const { id } = req.params;
 
-    const product = await Product.findById(id).populate({
-        path: 'category',
-        select: 'category_name slug description -_id'
-    }).populate({
-        path: 'images',
-        select: 'image_url public_id  -_id'
-    }).populate({
-        path: 'variants',
-        select: 'price sku quantity mrp discount -_id'
-    }).populate({
-        path: 'reviews',
-        select: 'rating review -_id'
-    })
+    // 1. .lean() add kiya taaki pure JavaScript object mile jise hum modify kar sakein
+    const product = await Product.findById(id)
+        .populate({
+            path: 'category',
+            select: 'category_name slug description -_id'
+        })
+        .populate({
+            path: 'images',
+            select: 'images -_id'
+        })
+        .populate({
+            path: 'variants',
+            select: 'variants -_id'
+        })
+        .populate({
+            path: 'reviews',
+            select: 'rating review -_id'
+        })
+        .lean(); // <-- Important for modifying the object
 
     if (!product) {
-        throw new NotFoundError('Product not found')
+        throw new NotFoundError('Product not found');
     }
+
+    // 2. Single image aur single variant nikalne ka logic
+    let singleImage = null;
+    let singleVariant = null;
+
+    if (product.images && product.images.images && product.images.images.length > 0) {
+        singleImage = product.images.images;
+    }
+
+    if (product.variants && product.variants.variants && product.variants.variants.length > 0) {
+        singleVariant = product.variants.variants;
+    }
+
+    // 3. Original objects ko flat single object se replace kar diya
+    product.images = singleImage;
+    product.variants = singleVariant;
 
     res.status(200).json({
         success: true,
         data: product
-    })
-})
+    });
+});
 
 const uploadProductImages = asyncHandler(async (req, res) => {
+
     if (!req.files || req.files.length === 0) {
-        throw new BadRequestError('No files uploaded')
+        throw new BadRequestError("No files uploaded.");
     }
 
-    const productId = req.params.id
-    const product = await Product.findById(productId)
+    const { id: productId } = req.params;
+
+    const product = await Product.findById(productId);
+
     if (!product) {
-        throw new NotFoundError('Product not found')
+        throw new NotFoundError("Product not found.");
     }
 
-    const uploadedImages = []
+    // Check if ProductImage document already exists
+    let imageDocument = await ProductImage.findOne({
+        product: productId
+    });
+
+    // Upload all images to Cloudinary
+    const uploadedImages = [];
+
     for (const file of req.files) {
-        const result = await uploadToCloudinary(file.buffer, 'products')
-        const productImage = await ProductImage.create({
-            product: productId,
-            image_url: result.secure_url,
+
+        const result = await uploadToCloudinary(
+            file.buffer,
+            "products"
+        );
+
+        uploadedImages.push({
+
             public_id: result.public_id,
-        })
-        uploadedImages.push(productImage)
+
+            image_url: result.secure_url,
+
+            is_primary: false
+
+        });
+
     }
 
-    // Update the product with the new images
-    product.images.push(...uploadedImages.map(img => img._id))
-    await product.save()
+    // First Image Document for this Product
+    if (!imageDocument) {
+
+        // Make first uploaded image primary
+        if (uploadedImages.length > 0) {
+            uploadedImages[0].is_primary = true;
+        }
+
+        imageDocument = await ProductImage.create({
+
+            product: productId,
+
+            images: uploadedImages
+
+        });
+
+        // Save ProductImage document id in Product
+        product.images = imageDocument._id;
+
+        await product.save();
+
+    } else {
+
+        // If no primary image exists
+        if (!imageDocument.images.some(img => img.is_primary)) {
+            uploadedImages[0].is_primary = true;
+        }
+
+        imageDocument.images.push(...uploadedImages);
+
+        await imageDocument.save();
+
+    }
+
+    res.status(201).json({
+
+        success: true,
+
+        message: "Product images uploaded successfully.",
+
+        data: imageDocument
+
+    });
+
+});
+
+const updateProductImage = asyncHandler(async (req, res) => {
+
+    const { productId, imageId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+        throw new BadRequestError("Please upload an image.");
+    }
+
+    // Check Product
+    const product = await Product.findById(productId);
+
+    if (!product) {
+        throw new NotFoundError("Product not found.");
+    }
+
+    // Find Image Document
+    const imageDocument = await ProductImage.findOne({
+        product: productId
+    });
+
+    if (!imageDocument) {
+        throw new NotFoundError(
+            "Product images not found."
+        );
+    }
+
+    // Find Image inside images array
+    const image = imageDocument.images.id(imageId);
+
+    if (!image) {
+        throw new NotFoundError(
+            "Image not found."
+        );
+    }
+
+    // Delete old image from Cloudinary
+    const cloudinaryResponse = await deleteFromCloudinary(
+        image.public_id
+    );
+
+    if (
+        cloudinaryResponse.result !== "ok" &&
+        cloudinaryResponse.result !== "not found"
+    ) {
+        throw new ServiceUnavailableError(
+            "Unable to delete old image from Cloudinary."
+        );
+    }
+
+    // Upload new image
+    const result = await uploadToCloudinary(
+        file.buffer,
+        "products"
+    );
+
+    // Update Database
+    image.public_id = result.public_id;
+    image.image_url = result.secure_url;
+
+    await imageDocument.save();
 
     res.status(200).json({
+
         success: true,
-        data: uploadedImages
-    })
-})
+
+        message: "Product image updated successfully.",
+
+        data: image
+
+    });
+
+});
 
 const createProductVariant = asyncHandler(async (req, res) => {
-    const productId = req.params.id
-    const { quantity, sku, price, mrp, discount } = req.body
 
-    const product = await Product.findById(productId)
-    if (!product) {
-        throw new NotFoundError('Product not found')
-    }
+    const { id } = req.params;
 
-    const variant = await ProductVariant.create({
-        product: productId,
+    const {
         quantity,
         sku,
         price,
         mrp,
         discount
-    })
+    } = req.body;
 
-    // Add the variant to the product's variants array
-    product.variants.push(variant._id)
-    await product.save()
+    const product = await Product.findById(id);
+
+    if (!product) {
+        throw new NotFoundError("Product not found");
+    }
+
+    let variant = await ProductVariant.findOne({
+        product: id
+    });
+
+    if (!variant) {
+
+        variant = await ProductVariant.create({
+
+            product: id,
+
+            variants: [{
+
+                quantity,
+
+                sku,
+
+                price,
+
+                mrp,
+
+                discount
+
+            }]
+
+        });
+
+        product.variants = variant._id;
+
+        await product.save();
+
+    } else {
+
+        const alreadyExists =
+            variant.variants.find(
+                item => item.quantity === quantity
+            );
+
+        if (alreadyExists) {
+            throw new BadRequestError(
+                "Variant already exists."
+            );
+        }
+
+        variant.variants.push({
+
+            quantity,
+
+            sku,
+
+            price,
+
+            mrp,
+
+            discount
+
+        });
+
+        await variant.save();
+
+    }
 
     res.status(201).json({
+
         success: true,
+
         data: variant
-    })
-});
 
-const updateProductimage = asyncHandler(async (req, res) => {
-    const { productId, imageId } = req.params;
-    const file = req.file;
-
-    const product = await Product.findById(productId);
-    if (!product) {
-        throw new NotFoundError('Product not found');
-    }
-
-    const image = await ProductImage.findById(imageId);
-    if (!image) {
-        throw new NotFoundError('Image not found');
-    }
-
-    // Check if the image belongs to the product
-    if (!product.images.includes(imageId)) {
-        throw new BadRequestError('Image does not belong to this product');
-    }
-
-    // delete the old image from Cloudinary
-    await deleteFromCloudinary(image.public_id);
-
-    // upload the new image to Cloudinary
-    const result = await uploadToCloudinary(file.buffer, 'products');
-
-    // update the image details
-    image.image_url = result.secure_url;
-    image.public_id = result.public_id;
-    await image.save();
-
-    res.status(200).json({
-        success: true,
-        data: image
     });
 
 });
 
 const updateProductVariant = asyncHandler(async (req, res) => {
-    const { productId, variantId } = req.params
-    const { quantity, sku, price, mrp, discount } = req.body
 
-    const product = await Product.findById(productId)
+    const { productId } = req.params;
 
-    if (!product) {
-        throw new NotFoundError('Product not found')
+    const { quantity, price, mrp, discount } = req.body;
+
+    // Validate quantity
+    if (!quantity) {
+        throw new BadRequestError("Quantity is required.");
     }
 
-    const variant = await ProductVariant.findOne({
-        _id: variantId,
-        product: productId  // ← Yeh check zaruri hai!
-    })
+    // Find Variant Document using Product Id
+    const variantDocument = await ProductVariant.findOne({
+        product: productId
+    });
+
+    if (!variantDocument) {
+        throw new NotFoundError("Product variant not found.");
+    }
+
+    // Find particular quantity
+    const variant = variantDocument.variants.find(
+        item => item.quantity === quantity
+    );
 
     if (!variant) {
         throw new NotFoundError(
-            'Variant not found or does not belong to this product'
-        )
+            `Variant with quantity '${quantity}' not found.`
+        );
     }
 
-    const updateFields = {}
-    if (quantity !== undefined) updateFields.quantity = quantity
-    if (sku !== undefined) updateFields.sku = sku
-    if (price !== undefined) updateFields.price = price
-    if (mrp !== undefined) updateFields.mrp = mrp
-    if (discount !== undefined) updateFields.discount = discount
-
-    // Kuch update karne ko hai?
-    if (Object.keys(updateFields).length === 0) {
-        throw new BadRequestError('No fields provided to update')
+    // Update only allowed fields
+    if (price !== undefined) {
+        variant.price = price;
     }
 
-    const updatedVariant = await ProductVariant.findByIdAndUpdate(
-        variantId,
-        { $set: updateFields }, // ← $set use karo
-        { new: true }
-    )
+    if (mrp !== undefined) {
+        variant.mrp = mrp;
+    }
+
+    if (discount !== undefined) {
+        variant.discount = discount;
+    }
+
+    await variantDocument.save();
 
     res.status(200).json({
+
         success: true,
-        message: 'Variant updated successfully',
-        data: updatedVariant
-    })
+
+        message: "Product variant updated successfully.",
+
+        data: variant
+
+    });
+
 });
 
 
@@ -229,6 +443,6 @@ module.exports = {
     getProductById,
     uploadProductImages,
     createProductVariant,
-    updateProductimage,
+    updateProductImage,
     updateProductVariant
 }
