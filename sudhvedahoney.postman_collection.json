@@ -748,6 +748,174 @@
             ]
         },
         {
+            "name": "Product Videos",
+            "item": [
+                {
+                    "name": "Upload Product Video",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "video",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/videos/upload/{{productId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "videos",
+                                "upload",
+                                "{{productId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Product Videos",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/videos/{{productId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "videos",
+                                "{{productId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Product Video",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/videos/{{videoId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "videos",
+                                "{{videoId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Feedback Videos",
+            "item": [
+                {
+                    "name": "Upload Feedback Video",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "video",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feedback/video/upload",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "feedback",
+                                "video",
+                                "upload"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Feedback Videos",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feedback/all-feedback/videos",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "feedback",
+                                "all-feedback",
+                                "videos"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Feedback Video",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feedback/remove-feedback/{{videoId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "feedback",
+                                "remove-feedback",
+                                "{{videoId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
             "name": "Product Reviews",
             "item": [
                 {

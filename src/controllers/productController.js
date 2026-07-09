@@ -41,7 +41,10 @@ const getAllProducts = asyncHandler(async (req, res) => {
     }).populate({
         path: 'variants',
         select: 'price sku quantity mrp discount -_id'
-    }).populate('reviews')
+    }).populate({
+        path: 'reviews',
+        select: 'rating review -_id'
+    })
 
     res.status(200).json({
         success: true,
@@ -61,7 +64,10 @@ const getProductById = asyncHandler(async (req, res) => {
     }).populate({
         path: 'variants',
         select: 'price sku quantity mrp discount -_id'
-    }).populate('reviews')
+    }).populate({
+        path: 'reviews',
+        select: 'rating review -_id'
+    })
 
     if (!product) {
         throw new NotFoundError('Product not found')

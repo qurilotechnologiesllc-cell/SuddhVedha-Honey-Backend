@@ -360,6 +360,46 @@ OTP messages are sent using the AutoBySMS service through [src/utils/sendOtp.js]
 - `AUTOBYSMS_SENDER_ID`
 - `AUTOBYSMS_TEMPLATE_ID`
 
+## Product Video Endpoints
+
+### 20) Upload Product Video
+
+- Method: POST
+- URL: `/api/videos/upload/:productId`
+- Body: multipart/form-data with key `video`
+- Path Param: `productId`
+
+### 21) Get Product Videos
+
+- Method: GET
+- URL: `/api/videos/:productId`
+- Path Param: `productId`
+
+### 22) Delete Product Video
+
+- Method: DELETE
+- URL: `/api/videos/:videoId`
+- Path Param: `videoId`
+
+## Feedback Video Endpoints
+
+### 23) Upload Feedback Video
+
+- Method: POST
+- URL: `/api/feedback/video/upload`
+- Body: multipart/form-data with key `video`
+
+### 24) Get All Feedback Videos
+
+- Method: GET
+- URL: `/api/feedback/all-feedback/videos`
+
+### 25) Remove Feedback Video
+
+- Method: DELETE
+- URL: `/api/feedback/remove-feedback/:videoId`
+- Path Param: `videoId`
+
 ## Postman Collection
 
 A ready-to-import Postman collection is available at:

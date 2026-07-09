@@ -54,6 +54,11 @@ const ProductSchema = new mongoose.Schema(
             ref: "ProductImage"
         }],
 
+        videos: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "ProductVideo"
+        }],
+
         variants: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVariant"
