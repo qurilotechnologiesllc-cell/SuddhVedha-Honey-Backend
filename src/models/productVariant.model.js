@@ -21,7 +21,8 @@ const VariantItemSchema = new mongoose.Schema({
 
     price: {
         type: Number,
-        required: true
+        required: true,
+        index: true        // optional
     },
 
     mrp: {
