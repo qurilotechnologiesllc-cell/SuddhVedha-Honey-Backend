@@ -79,6 +79,74 @@ const getAllProducts = asyncHandler(async (req, res) => {
     });
 });
 
+const getProductsByPagination = asyncHandler(async (req, res) => {
+
+    // ─── Page aur Limit Query se lo ─────────────
+    let { page, limit } = req.query
+
+    page = Number(page) || 1  // Default page 1
+    limit = Number(limit) || 4  // Default 4 products
+
+    // ─── Validation ─────────────────────────────
+    if (page < 1) {
+        throw new BadRequestError('Page number must be greater than 0')
+    }
+
+    // ─── Skip Calculate karo ────────────────────
+    // Page 1 → skip 0  → product 1,2,3,4
+    // Page 2 → skip 4  → product 5,6,7,8
+    // Page 3 → skip 8  → product 9,10,11,12
+    const skip = (page - 1) * limit
+
+    // ─── Total Products Count ────────────────────
+    const totalProducts = await Product.countDocuments({
+        is_active: true
+    })
+
+    // ─── Total Pages Calculate karo ─────────────
+    const totalPages = Math.ceil(totalProducts / limit)
+
+    // ─── Page exist karta hai? ───────────────────
+    if (page > totalPages) {
+        throw new BadRequestError(
+            `Page ${page} does not exist. Total pages: ${totalPages}`
+        )
+    }
+
+    // ─── Products Fetch karo ─────────────────────
+    const products = await Product.find({ is_active: true })
+        .populate({
+            path: 'images',
+            select: 'images -_id'
+        })
+        .populate({
+            path: 'variants',
+            select: 'variants -_id'
+        })
+        .populate({
+            path: 'category',
+            select: 'category_name slug -_id'
+        })
+        .sort({ createdAt: -1 }) // Nayi products pehle
+        .skip(skip)              // Kitne skip karne hain
+        .limit(limit)            // Kitne dikhane hain
+
+    // ─── Response ────────────────────────────────
+    res.status(200).json({
+        success: true,
+        message: 'Products fetched successfully',
+        pagination: {
+            currentPage: page,
+            totalPages,
+            totalProducts,
+            limit,
+            hasNextPage: page < totalPages,  // Next button enable?
+            hasPrevPage: page > 1            // Prev button enable?
+        },
+        data: products
+    })
+})
+
 const getProductById = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
@@ -440,6 +508,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
 module.exports = {
     createProduct,
     getAllProducts,
+    getProductsByPagination,
     getProductById,
     uploadProductImages,
     createProductVariant,

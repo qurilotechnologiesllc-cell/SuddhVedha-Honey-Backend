@@ -616,6 +616,35 @@
                     "response": []
                 },
                 {
+                    "name": "Get Products with Pagination",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/products/paginate?page=1&limit=4",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "products",
+                                "paginate"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "4"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
                     "name": "Upload Product Images",
                     "request": {
                         "method": "POST",
@@ -933,6 +962,114 @@
                                 "filter",
                                 "category",
                                 "honey"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Filter Products by Price Range",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/filter/price?minPrice=100&maxPrice=500",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "filter",
+                                "price"
+                            ],
+                            "query": [
+                                {
+                                    "key": "minPrice",
+                                    "value": "100"
+                                },
+                                {
+                                    "key": "maxPrice",
+                                    "value": "500"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Filter Products by Rating",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/filter/rating?minRating=4&maxRating=5",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "filter",
+                                "rating"
+                            ],
+                            "query": [
+                                {
+                                    "key": "minRating",
+                                    "value": "4"
+                                },
+                                {
+                                    "key": "maxRating",
+                                    "value": "5"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Filter Products by Quantity",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/filter/quantity?quantity=500g",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "filter",
+                                "quantity"
+                            ],
+                            "query": [
+                                {
+                                    "key": "quantity",
+                                    "value": "500g"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Search Products by Name",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/filter/search?name=honey",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "filter",
+                                "search"
+                            ],
+                            "query": [
+                                {
+                                    "key": "name",
+                                    "value": "honey"
+                                }
                             ]
                         }
                     },

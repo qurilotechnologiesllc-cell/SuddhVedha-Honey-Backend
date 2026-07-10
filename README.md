@@ -400,6 +400,33 @@ OTP messages are sent using the AutoBySMS service through [src/utils/sendOtp.js]
 - URL: `/api/feedback/remove-feedback/:videoId`
 - Path Param: `videoId`
 
+## Filter Product Endpoints
+
+### 26) Filter Products by Category Slug
+
+- Method: GET
+- URL: `/api/filter/category/:slug`
+- Path Param: `slug`
+
+### 27) Filter Products by Price Range
+
+- Method: GET
+- URL: `/api/filter/price?minPrice=100&maxPrice=500`
+- Query Params: `minPrice`, `maxPrice`
+
+### 28) Filter Products by Rating
+
+- Method: GET
+- URL: `/api/filter/rating?minRating=4&maxRating=5`
+- Query Params: `minRating`, `maxRating`
+
+### 29) Filter Products by Quantity
+
+- Method: GET
+- URL: `/api/filter/quantity?quantity=500g`
+- Query Param: `quantity`
+- Allowed values: `100g`, `250g`, `500g`, `1kg`, `2kg`
+
 ## Postman Collection
 
 A ready-to-import Postman collection is available at:
