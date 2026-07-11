@@ -860,6 +860,128 @@
             ]
         },
         {
+            "name": "User Enquiry",
+            "item": [
+                {
+                    "name": "Submit User Enquiry",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"mobile\": \"9876543210\",\n  \"subject\": \"Product query\",\n  \"message\": \"I have a question about this product.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/enquiry/submit",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "enquiry",
+                                "submit"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Gift Boxes",
+            "item": [
+                {
+                    "name": "Add Gift Box",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "Premium Gift Box",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "price",
+                                    "value": "999",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "description",
+                                    "value": "Luxury honey gift box",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "image",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/gift-box",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "gift-box"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Gift Boxes",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/gift-box",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "gift-box"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Gift Box",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/admin/remove/gift-box/{{giftBoxId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "remove",
+                                "gift-box",
+                                "{{giftBoxId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
             "name": "Feedback Videos",
             "item": [
                 {

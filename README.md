@@ -427,6 +427,26 @@ OTP messages are sent using the AutoBySMS service through [src/utils/sendOtp.js]
 - Query Param: `quantity`
 - Allowed values: `100g`, `250g`, `500g`, `1kg`, `2kg`
 
+## User Enquiry Endpoint
+
+### 30) Submit User Enquiry
+
+- Method: POST
+- URL: `/api/enquiry/submit`
+- Body (JSON):
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "mobile": "9876543210",
+  "subject": "Product query",
+  "message": "I have a question about this product."
+}
+```
+
+This route saves the enquiry and sends a thank-you email to the user using Brevo.
+
 ## Postman Collection
 
 A ready-to-import Postman collection is available at:

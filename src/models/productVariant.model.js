@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const VariantItemSchema = new mongoose.Schema({
 
-    quantity: {
+    weight: {
         type: String,
         enum: [
             "100g",
@@ -35,7 +35,7 @@ const VariantItemSchema = new mongoose.Schema({
         default: 0
     }
 
-}, { _id: false });
+});
 
 const ProductVariantSchema = new mongoose.Schema({
 

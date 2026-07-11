@@ -25,7 +25,7 @@ router.put('/:productId/images/:imageId', uploadSingle, updateProductImage)
 router.post('/:id/variants', createProductVariant)
 
 // Route to update a product variant
-router.put('/:productId/variants', updateProductVariant)
+router.put('/:productId/variants/:variantId', updateProductVariant)
 
 
 module.exports = router

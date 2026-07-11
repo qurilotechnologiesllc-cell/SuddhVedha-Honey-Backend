@@ -362,7 +362,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     const {
-        quantity,
+        weight,
         sku,
         price,
         mrp,
@@ -387,7 +387,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
             variants: [{
 
-                quantity,
+                weight,
 
                 sku,
 
@@ -409,7 +409,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
         const alreadyExists =
             variant.variants.find(
-                item => item.quantity === quantity
+                item => item.weight === weight
             );
 
         if (alreadyExists) {
@@ -420,7 +420,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
         variant.variants.push({
 
-            quantity,
+            weight,
 
             sku,
 
@@ -448,61 +448,66 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
 const updateProductVariant = asyncHandler(async (req, res) => {
 
-    const { productId } = req.params;
+    const { productId, variantId } = req.params
+    const { price, mrp, discount } = req.body
 
-    const { quantity, price, mrp, discount } = req.body;
-
-    // Validate quantity
-    if (!quantity) {
-        throw new BadRequestError("Quantity is required.");
+    // ─── Kuch update karne ko hai? ───────────────
+    if (price === undefined && mrp === undefined && discount === undefined) {
+        throw new BadRequestError(
+            'At least one field required: price, mrp or discount'
+        )
     }
 
-    // Find Variant Document using Product Id
+    // ─── Product Variant Document Dhundo ─────────
     const variantDocument = await ProductVariant.findOne({
         product: productId
-    });
+    })
 
     if (!variantDocument) {
-        throw new NotFoundError("Product variant not found.");
+        throw new NotFoundError('Product variant not found')
     }
 
-    // Find particular quantity
+    // ─── Variant ID se find karo ─────────────────
     const variant = variantDocument.variants.find(
-        item => item.quantity === quantity
-    );
+        item => item._id.toString() === variantId
+        //            ↑
+        // ObjectId ko string mein convert karo
+        // phir compare karo
+    )
 
     if (!variant) {
         throw new NotFoundError(
-            `Variant with quantity '${quantity}' not found.`
-        );
+            'Variant not found with this ID'
+        )
     }
 
-    // Update only allowed fields
-    if (price !== undefined) {
-        variant.price = price;
+    // ─── Sirf jo fields aaye hain update karo ────
+    if (price !== undefined) variant.price = Number(price)
+    if (mrp !== undefined) variant.mrp = Number(mrp)
+    if (discount !== undefined) variant.discount = Number(discount)
+
+    // ─── Price/MRP Validation ─────────────────────
+    if (variant.price > variant.mrp) {
+        throw new BadRequestError(
+            'Price cannot be greater than MRP'
+        )
     }
 
-    if (mrp !== undefined) {
-        variant.mrp = mrp;
+    // ─── Discount Validation ──────────────────────
+    if (variant.discount < 0 || variant.discount > 100) {
+        throw new BadRequestError(
+            'Discount must be between 0 and 100'
+        )
     }
 
-    if (discount !== undefined) {
-        variant.discount = discount;
-    }
-
-    await variantDocument.save();
+    await variantDocument.save()
 
     res.status(200).json({
-
         success: true,
-
-        message: "Product variant updated successfully.",
-
+        message: 'Product variant updated successfully',
         data: variant
-
-    });
-
-});
+    })
+})
 
 
 module.exports = {
