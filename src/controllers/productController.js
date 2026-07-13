@@ -50,6 +50,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
             path: 'reviews',
             select: 'rating review -_id'
         })
+        .select('-createdAt -updatedAt -__v')
         .lean(); // <-- Super Important!
 
     // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li
@@ -168,6 +169,7 @@ const getProductById = asyncHandler(async (req, res) => {
             path: 'reviews',
             select: 'rating review -_id'
         })
+        .select('-createdAt -updatedAt -__v')
         .lean(); // <-- Important for modifying the object
 
     if (!product) {

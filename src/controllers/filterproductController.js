@@ -18,23 +18,23 @@ const filterProductByCategory = asyncHandler(async (req, res) => {
     }
 
     const products = await Product.find({
-        category: category._id,
+        categoryId: category._id,
         is_active: true
     })
         .populate({
-            path: "category",
+            path: "categoryId",
             select: "category_name slug"
         })
         .populate({
-            path: "variants",
+            path: "variantDocumentId",
             select: "variants -_id"
         })
         .populate({
-            path: "images",
+            path: "imageDocumentId",
             select: "images -_id"
         })
         .populate({
-            path: "videos",
+            path: "videoDocumentId",
             select: "videos -_id"
         })
         .lean();
@@ -103,10 +103,10 @@ const filterProductByQuantityPrice = asyncHandler(async (req, res) => {
         },
         is_active: true
     })
-        .populate("category")
-        .populate("variants")
-        .populate("images")
-        .populate("videos");
+        .populate("categoryId")
+        .populate("variantDocumentId")
+        .populate("imageDocumentId")
+        .populate("videoDocumentId").select('-createdAt -updatedAt -__v');
 
     res.status(200).json({
 
@@ -157,15 +157,15 @@ const filterProductByRating = asyncHandler(async (req, res) => {
         }
     })
         .populate({
-            path: 'category',
+            path: 'categoryId',
             select: 'category_name slug -_id'
         })
         .populate({
-            path: 'images',
+            path: 'imageDocumentId',
             select: 'images -_id'
         })
         .populate({
-            path: 'variants',
+            path: 'variantDocumentId',
             select: 'variants -_id'
         })
         .sort({ average_rating: -1 }) // ← High rating pehle
@@ -216,7 +216,7 @@ const filterProductByQuantity = asyncHandler(async (req, res) => {
     const variantDocuments = await ProductVariant.find({
         variants: {
             $elemMatch: {
-                quantity
+                weight: quantity
             }
         }
     }).select("product");
@@ -238,10 +238,10 @@ const filterProductByQuantity = asyncHandler(async (req, res) => {
         },
         is_active: true
     })
-        .populate("category")
-        .populate("variants")
-        .populate("images")
-        .populate("videos");
+        .populate("categoryId")
+        .populate("variantDocumentId")
+        .populate("imageDocumentId")
+        .populate("videoDocumentId");
 
     res.status(200).json({
 
@@ -276,15 +276,15 @@ const filterProductByProductName = asyncHandler(async (req, res) => {
         }
     })
         .populate({
-            path: 'images',
+            path: 'imageDocumentId',
             select: 'images -_id'
         })
         .populate({
-            path: 'variants',
+            path: 'variantDocumentId',
             select: 'variants -_id'
         })
         .populate({
-            path: 'category',
+            path: 'categoryId',
             select: 'category_name slug -_id'
         })
 

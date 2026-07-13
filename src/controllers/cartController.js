@@ -32,12 +32,13 @@ const getCart = asyncHandler(async (req, res) => {
     // ─── Cart fetch karo ─────────────────────────
     const cart = await Cart.findOne({ userId })
         .populate('items.productId',
-            'product_name brand flavor description images variants'
+            'product_name brand flavor description imageDocumentId variantDocumentId'
         )
 
     if (!cart) {
         throw new NotFoundError('Cart not found for the user')
     }
+    
 
     // ─── Har item ke liye image + variant fetch ───
     const itemsWithDetails = await Promise.all(
@@ -48,7 +49,7 @@ const getCart = asyncHandler(async (req, res) => {
             // Product ki images field mein main
             // document ka ID hai
             const imageDocument = await ProductImage.findById(
-                product.images
+                product.imageDocumentId
             ).select('images')
 
             // Sirf pehli image chahiye cart ke liye
@@ -58,7 +59,7 @@ const getCart = asyncHandler(async (req, res) => {
             // Product ki variants field mein main
             // document ka ID hai
             const variantDocument = await ProductVariant.findById(
-                product.variants
+                product.variantDocumentId
             ).select('variants')
 
             // Cart mein save variantId se

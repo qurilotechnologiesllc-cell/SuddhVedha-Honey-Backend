@@ -1,68 +1,69 @@
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 
 const offerSchema = new mongoose.Schema(
     {
-        title: {
+        couponCode: {
             type: String,
-            required: [true, 'Offer title is required'],
+            required: [true, "Coupon code is required"],
+            unique: true,
+            uppercase: true,
             trim: true,
-            maxLength: [100, 'Title cannot exceed 100 characters']
-            // "Free Shipping on ₹2000"
-            // "10% OFF on ₹3000"
-            // "Flat ₹500 OFF"
         },
 
         minimumOrderAmount: {
             type: Number,
-            required: [true, 'Minimum order amount is required'],
-            min: [0, 'Minimum order amount cannot be negative']
-            // 2000, 3000, 5000
+            required: true,
+            min: 0,
         },
 
         discountType: {
             type: String,
-            required: [true, 'Discount type is required'],
-            enum: {
-                values: ['FREE_SHIPPING', 'PERCENTAGE', 'FLAT'],
-                message: 'discountType must be FREE_SHIPPING, PERCENTAGE or FLAT'
-            }
-            // FREE_SHIPPING → Shipping free
-            // PERCENTAGE    → % off on total
-            // FLAT          → Fixed amount off
+            enum: ["FREE_SHIPPING", "PERCENTAGE", "FLAT"],
+            required: true,
         },
 
         discountValue: {
             type: Number,
-            required: [true, 'Discount value is required'],
-            min: [0, 'Discount value cannot be negative']
-            // FREE_SHIPPING → 0
-            // PERCENTAGE    → 10 (matlab 10%)
-            // FLAT          → 500 (matlab ₹500 off)
+            required: true,
+            min: 0,
+        },
+
+        // Only for percentage discount
+        maximumDiscount: {
+            type: Number,
+            default: null,
+        },
+
+        description: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: 100,
         },
 
         isActive: {
             type: Boolean,
-            default: true
-        }
+            default: true,
+        },
     },
-    { timestamps: true }
-)
+    {
+        timestamps: true,
+    }
+);
 
-// ─── Custom Validation ───────────────────────────
-// PERCENTAGE 1-100 ke beech honi chahiye
-offerSchema.pre('save', async function () {
-    if (this.discountType === 'PERCENTAGE') {
+offerSchema.pre("save", function (next) {
+    if (this.discountType === "PERCENTAGE") {
         if (this.discountValue < 1 || this.discountValue > 100) {
-            throw new Error(
-                'Percentage discount must be between 1 and 100'
-            )
+            return next(
+                new Error("Percentage discount must be between 1 and 100")
+            );
         }
     }
 
-    // FREE_SHIPPING mein discountValue 0 hona chahiye
-    if (this.discountType === 'FREE_SHIPPING') {
-        this.discountValue = 0
+    if (this.discountType === "FREE_SHIPPING") {
+        this.discountValue = 0;
     }
-})
+    next
+});
 
-module.exports = mongoose.model('Offer', offerSchema)
+module.exports = mongoose.model("Offers", offerSchema);

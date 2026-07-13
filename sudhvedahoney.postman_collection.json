@@ -49,6 +49,11 @@
             "key": "reviewId",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "giftBoxId",
+            "value": "",
+            "type": "string"
         }
     ],
     "item": [
@@ -759,7 +764,7 @@
                             "raw": "{\n  \"quantity\": \"200g\",\n  \"sku\": \"SKU123-UPDATED\",\n  \"price\": 219.99,\n  \"mrp\": 269.99,\n  \"discount\": 25\n}"
                         },
                         "url": {
-                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants",
+                            "raw": "{{baseUrl}}/api/products/{{productId}}/variants/{{variantId}}",
                             "host": [
                                 "{{baseUrl}}"
                             ],
@@ -767,7 +772,8 @@
                                 "api",
                                 "products",
                                 "{{productId}}",
-                                "variants"
+                                "variants",
+                                "{{variantId}}"
                             ]
                         }
                     },
@@ -974,6 +980,150 @@
                                 "remove",
                                 "gift-box",
                                 "{{giftBoxId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Gift Wraps",
+            "item": [
+                {
+                    "name": "Add Gift Wrap Color",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"color\": \"Red\",\n  \"price\": 50\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/giftwrap/add",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "giftwrap",
+                                "add"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Gift Wrap Colors",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/giftwrap/all",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "giftwrap",
+                                "all"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Gift Wrap Color",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/giftwrap/remove/{{wrapId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "giftwrap",
+                                "remove",
+                                "{{wrapId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "Offers",
+            "item": [
+                {
+                    "name": "Add Offer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Summer Sale\",\n  \"description\": \"20% off on all honey products\",\n  \"discount\": 20,\n  \"startDate\": \"2026-07-01\",\n  \"endDate\": \"2026-08-01\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/offers/add",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "offers",
+                                "add"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Offers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/offers/all",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "offers",
+                                "all"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Offer",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/offers/remove/{{offerId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "offers",
+                                "remove",
+                                "{{offerId}}"
                             ]
                         }
                     },

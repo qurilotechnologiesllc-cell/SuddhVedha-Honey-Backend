@@ -3,14 +3,16 @@ const { asyncHandler, BadRequestError, NotFoundError, ConflictError } = require(
 
 const addOffer = asyncHandler(async (req, res) => {
     const {
-        title,
+        couponCode,
         minimumOrderAmount,
         discountType,
-        discountValue
+        discountValue,
+        maximumDiscount,
+        description
     } = req.body
 
     // ─── Required Fields ─────────────────────────
-    if (!title || !minimumOrderAmount || !discountType) {
+    if (!couponCode || !minimumOrderAmount || !discountType || !description) {
         throw new BadRequestError(
             'Title, minimumOrderAmount and discountType are required'
         )
@@ -59,26 +61,29 @@ const addOffer = asyncHandler(async (req, res) => {
         }
     }
 
-    // ─── Duplicate Title Check ────────────────────
-    const existingOffer = await Offer.findOne({
-        title: { $regex: new RegExp(`^${title}$`, 'i') }
-    })
-    if (existingOffer) {
-        throw new ConflictError(
-            `Offer "${title}" already exists`
-        )
+    const existingCoupon = await Offers.findOne({
+        couponCode: couponCode.toUpperCase()
+    });
+
+    if (existingCoupon) {
+        throw new ConflictError("Coupon code already exists");
     }
 
     // ─── Save karo ───────────────────────────────
-    const offer = await Offer.create({
-        title,
+    const offer = await Offers.create({
+        couponCode: couponCode.toUpperCase(),
         minimumOrderAmount: Number(minimumOrderAmount),
         discountType,
-        discountValue: discountType === 'FREE_SHIPPING'
-            ? 0                        // ← Always 0
-            : Number(discountValue),
-        isActive: true
-    })
+        discountValue:
+            discountType === "FREE_SHIPPING"
+                ? 0
+                : Number(discountValue),
+        maximumDiscount:
+            discountType === "PERCENTAGE"
+                ? Number(maximumDiscount) || null
+                : null,
+        description,
+    });
 
     res.status(201).json({
         success: true,
@@ -89,7 +94,7 @@ const addOffer = asyncHandler(async (req, res) => {
 
 const getAllOffers = asyncHandler(async (req, res) => {
 
-    const offers = await Offer.find({ isActive: true })
+    const offers = await Offers.find({ isActive: true })
         .select('-__v')
         .sort({ minimumOrderAmount: 1 })
     // ↑ Sabse kam amount wala offer pehle
@@ -115,12 +120,12 @@ const removeOffer = asyncHandler(async (req, res) => {
     const { offerId } = req.params
 
     // ─── Offer Exist Karta Hai? ──────────────────
-    const offer = await Offer.findById(offerId)
+    const offer = await Offers.findById(offerId)
     if (!offer) {
         throw new NotFoundError('Offer not found')
     }
 
-    await Offer.findByIdAndDelete(offerId)
+    await Offers.findByIdAndDelete(offerId)
 
     res.status(200).json({
         success: true,
@@ -128,5 +133,66 @@ const removeOffer = asyncHandler(async (req, res) => {
     })
 })
 
+const applyCoupon = asyncHandler(async (req, res) => {
 
-module.exports = { addOffer, getAllOffers, removeOffer }
+    const { couponCode, cartAmount, shippingCharge = 0 } = req.body;
+
+    const offer = await Offers.findOne({
+        couponCode: couponCode.toUpperCase(),
+        isActive: true,
+    });
+
+    if (!offer) {
+        throw new NotFoundError("Invalid coupon");
+    }
+
+    if (cartAmount < offer.minimumOrderAmount) {
+        throw new BadRequestError(
+            `Minimum order amount should be ₹${offer.minimumOrderAmount}`
+        );
+    }
+
+    let discount = 0;
+    let shipping = shippingCharge;
+
+    switch (offer.discountType) {
+
+        case "FLAT":
+            discount = offer.discountValue;
+            break;
+
+        case "PERCENTAGE":
+            discount =
+                (cartAmount * offer.discountValue) / 100;
+
+            if (
+                offer.maximumDiscount &&
+                discount > offer.maximumDiscount
+            ) {
+                discount = offer.maximumDiscount;
+            }
+
+            break;
+
+        case "FREE_SHIPPING":
+            shipping = 0;
+            break;
+    }
+
+    const finalAmount = Math.max(
+        cartAmount - discount + shipping,
+        0
+    );
+
+    res.status(200).json({
+        success: true,
+        coupon: offer.couponCode,
+        discount,
+        shipping,
+        payableAmount: finalAmount,
+        offer,
+    });
+});
+
+
+module.exports = { addOffer, getAllOffers, removeOffer, applyCoupon }
