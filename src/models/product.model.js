@@ -44,22 +44,22 @@ const ProductSchema = new mongoose.Schema(
             default: 0
         },
 
-        category: {
+        categoryId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Category'
         },
 
-        images: {
+        imageDocumentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductImage"
         },
 
-        videos: {
+        videoDocumentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVideo"
         },
 
-        variants: {
+        variantDocumentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVariant"
         },

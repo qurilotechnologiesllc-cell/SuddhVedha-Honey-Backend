@@ -22,7 +22,7 @@ const createProduct = asyncHandler(async (req, res) => {
         flavor,
         description,
         manufacturer_information,
-        category: categoryId
+        categoryId
     })
 
     res.status(201).json({
@@ -35,15 +35,15 @@ const getAllProducts = asyncHandler(async (req, res) => {
     // 1. .lean() add kiya taaki hum data ko JS array ki tarah manipulate kar sakein
     const products = await Product.find({ is_active: true })
         .populate({
-            path: 'category',
+            path: 'categoryId',
             select: 'category_name slug description -_id'
         })
         .populate({
-            path: 'images',
+            path: 'imageDocumentId',
             select: 'images -_id'
         })
         .populate({
-            path: 'variants',
+            path: 'variantDocumentId',
             select: 'variants -_id'
         })
         .populate({
@@ -58,18 +58,18 @@ const getAllProducts = asyncHandler(async (req, res) => {
         let singleVariant = null;
 
         // Check kiya ki images object aur uske andar ka images array exist karta hai ya nahi
-        if (product.images && product.images.images && product.images.images.length > 0) {
-            singleImage = product.images.images; // Sirf pehla image object uthaya
+        if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
+            singleImage = product.imageDocumentId.images; // Sirf pehla image object uthaya
         }
         // Variants array se 1st variant nikala
-        if (product.variants && product.variants.variants && product.variants.variants.length > 0) {
-            singleVariant = product.variants.variants;
+        if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
+            singleVariant = product.variantDocumentId.variants;
         }
 
         return {
             ...product,
-            images: singleImage, // Pura object hata kar sirf single image object set kar diya
-            variants: singleVariant
+            imageDocumentId: singleImage, // Pura object hata kar sirf single image object set kar diya
+            variantDocumentId: singleVariant
         };
     });
 
@@ -153,15 +153,15 @@ const getProductById = asyncHandler(async (req, res) => {
     // 1. .lean() add kiya taaki pure JavaScript object mile jise hum modify kar sakein
     const product = await Product.findById(id)
         .populate({
-            path: 'category',
+            path: 'categoryId',
             select: 'category_name slug description -_id'
         })
         .populate({
-            path: 'images',
+            path: 'imageDocumentId',
             select: 'images -_id'
         })
         .populate({
-            path: 'variants',
+            path: 'variantDocumentId',
             select: 'variants -_id'
         })
         .populate({
@@ -178,17 +178,17 @@ const getProductById = asyncHandler(async (req, res) => {
     let singleImage = null;
     let singleVariant = null;
 
-    if (product.images && product.images.images && product.images.images.length > 0) {
-        singleImage = product.images.images;
+    if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
+        singleImage = product.imageDocumentId.images;
     }
 
-    if (product.variants && product.variants.variants && product.variants.variants.length > 0) {
-        singleVariant = product.variants.variants;
+    if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
+        singleVariant = product.variantDocumentId.variants;
     }
 
     // 3. Original objects ko flat single object se replace kar diya
-    product.images = singleImage;
-    product.variants = singleVariant;
+    product.imageDocumentId = singleImage;
+    product.variantDocumentId = singleVariant;
 
     res.status(200).json({
         success: true,
@@ -254,7 +254,7 @@ const uploadProductImages = asyncHandler(async (req, res) => {
         });
 
         // Save ProductImage document id in Product
-        product.images = imageDocument._id;
+        product.imageDocumentId = imageDocument._id;
 
         await product.save();
 
@@ -375,13 +375,13 @@ const createProductVariant = asyncHandler(async (req, res) => {
         throw new NotFoundError("Product not found");
     }
 
-    let variant = await ProductVariant.findOne({
+    let variantDoc = await ProductVariant.findOne({
         product: id
     });
 
-    if (!variant) {
+    if (!variantDoc) {
 
-        variant = await ProductVariant.create({
+        variantDoc = await ProductVariant.create({
 
             product: id,
 
@@ -401,14 +401,14 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
         });
 
-        product.variants = variant._id;
+        product.variantDocumentId = variantDoc._id;
 
         await product.save();
 
     } else {
 
         const alreadyExists =
-            variant.variants.find(
+            variantDoc.variants.find(
                 item => item.weight === weight
             );
 
@@ -418,7 +418,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
             );
         }
 
-        variant.variants.push({
+        variantDoc.variants.push({
 
             weight,
 
@@ -432,7 +432,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
         });
 
-        await variant.save();
+        await variantDoc.save();
 
     }
 
@@ -440,7 +440,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
         success: true,
 
-        data: variant
+        data: variantDoc
 
     });
 

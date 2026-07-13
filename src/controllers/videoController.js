@@ -61,7 +61,7 @@ const uploadProductVideo = asyncHandler(async (req, res) => {
 
         });
 
-        product.videos = videoDocument._id;
+        product.videoDocumentId = videoDocument._id;
 
         await product.save();
 
@@ -129,7 +129,7 @@ const getAllProductsVideo = asyncHandler(async (req, res) => {
     const { productId } = req.params;
 
     const product = await Product.findById(productId).populate({
-        path: "videos",
+        path: "videoDocumentId",
         select: "videos"
     });
 
@@ -137,15 +137,15 @@ const getAllProductsVideo = asyncHandler(async (req, res) => {
         throw new NotFoundError("Product not found.");
     }
 
-    if (!product.videos) {
+    if (!product.videoDocumentId) {
         throw new NotFoundError("No video document found.");
     }
 
-    if (product.videos.videos.length === 0) {
+    if (product.videoDocumentId.videos.length === 0) {
         throw new NotFoundError("No videos available for this product.");
     }
 
-    const videoData = product.videos.videos.map((video) => {
+    const videoData = product.videoDocumentId.videos.map((video) => {
 
         const videoUrl = cloudinary.url(video.public_id, {
             resource_type: "video",
@@ -247,7 +247,7 @@ const removeProductVideo = asyncHandler(async (req, res) => {
 
         await ProductVideo.findByIdAndDelete(videoDocument._id);
 
-        product.videos = null;
+        product.videoDocumentId = null;
 
         await product.save();
 
