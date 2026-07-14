@@ -21,16 +21,6 @@ const couponUsageSchema = new mongoose.Schema(
             trim: true,
         },
 
-        orderId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Order",
-            default: null
-        },
-
-        usedAt: {
-            type: Date,
-            default: Date.now,
-        },
     },
     {
         timestamps: true,

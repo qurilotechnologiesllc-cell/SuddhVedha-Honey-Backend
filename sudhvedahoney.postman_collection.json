@@ -54,6 +54,11 @@
             "key": "giftBoxId",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "offerId",
+            "value": "",
+            "type": "string"
         }
     ],
     "item": [
@@ -1074,7 +1079,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"title\": \"Summer Sale\",\n  \"description\": \"20% off on all honey products\",\n  \"discount\": 20,\n  \"startDate\": \"2026-07-01\",\n  \"endDate\": \"2026-08-01\"\n}"
+                            "raw": "{\n  \"title\": \"Summer Sale\",\n  \"couponCode\": \"SUMMER10\",\n  \"minimumOrderAmount\": 500,\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 10,\n  \"maximumDiscount\": 100\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/offers/add",
@@ -1122,6 +1127,92 @@
                             "path": [
                                 "api",
                                 "offers",
+                                "remove",
+                                "{{offerId}}"
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "User Coupons",
+            "item": [
+                {
+                    "name": "Get Available Coupons",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/coupon/all-coupons",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "coupon",
+                                "all-coupons"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Apply Coupon",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"couponCode\": \"SUMMER10\",\n  \"cartAmount\": 500,\n  \"shippingCharge\": 0\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/coupon/apply",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "coupon",
+                                "apply"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove Applied Coupon",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/coupon/remove/{{offerId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "coupon",
                                 "remove",
                                 "{{offerId}}"
                             ]
