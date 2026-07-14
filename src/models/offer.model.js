@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const offerSchema = new mongoose.Schema(
     {
+        title: {
+            type: String,
+            required: true,
+            trim: true,
+            maxlength: 100,
+        },
         couponCode: {
             type: String,
             required: [true, "Coupon code is required"],
@@ -34,12 +40,6 @@ const offerSchema = new mongoose.Schema(
             default: null,
         },
 
-        description: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: 100,
-        },
 
         isActive: {
             type: Boolean,
