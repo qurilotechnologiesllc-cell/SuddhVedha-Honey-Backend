@@ -1,4 +1,5 @@
 const Offers = require('../models/offer.model')
+const CouponUsage = require('../models/couponUsage.model')
 const { asyncHandler, BadRequestError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
 const addOffer = asyncHandler(async (req, res) => {
@@ -99,7 +100,18 @@ const getAllOffers = asyncHandler(async (req, res) => {
         .sort({ minimumOrderAmount: 1 })
     // ↑ Sabse kam amount wala offer pehle
 
-    if (!offers.length) {
+    const usedCoupons = await CouponUsage.find({
+        userId: req.user.id
+    }).select("couponCode");
+
+
+    const usedCouponCodes = usedCoupons.map(c => c.couponCode);
+
+    const availableCoupons = offers.filter(
+        offer => !usedCouponCodes.includes(offer.couponCode)
+    );
+
+    if (!availableCoupons.length) {
         return res.status(200).json({
             success: true,
             message: 'No offers available',
@@ -111,8 +123,8 @@ const getAllOffers = asyncHandler(async (req, res) => {
     res.status(200).json({
         success: true,
         message: 'Offers fetched successfully',
-        total: offers.length,
-        data: offers
+        total: availableCoupons.length,
+        data: availableCoupons
     })
 })
 
