@@ -92,8 +92,6 @@ const removeGiftBox = asyncHandler(async (req, res) => {
     if (!giftBox) {
         throw new NotFoundError('Gift box not found')
     }
-
-    console.log(giftBox.public_id);
     
 
     // ─── Cloudinary se Image Delete Karo ─────────

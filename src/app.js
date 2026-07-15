@@ -18,6 +18,7 @@ const GiftBoxRoutes = require('./routes/giftboxRoute')
 const GiftWrapRoutes = require('./routes/giftwarpRoute')
 const OfferRoutes = require('./routes/offerRoutes')
 const CouponRoutes = require('./routes/couponRoute')
+const GiftCartRoutes = require('./routes/giftCartRoutes')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -48,6 +49,7 @@ app.use('/api/offers', OfferRoutes);
 app.use('/api/admin', GiftBoxRoutes);
 app.use('/api/giftwrap', GiftWrapRoutes);
 app.use('/api/coupon', CouponRoutes);
+app.use('/api/giftcart', GiftCartRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
