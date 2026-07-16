@@ -4,108 +4,99 @@ const ProductVariant = require('../models/productVariant.model')
 const Product = require('../models/product.model')
 const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } = require('../errors/errorConfig')
 
+const { buildCartCatalog } = require('../services/cartCatalog.service')
+
+const buildNormalCart = require('../helpers/buildNormalCart.helper')
+const buildGiftCart = require('../helpers/buildGiftCart.helper')
+
 const addToCart = asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { productId, selectedWeight, quantity } = req.body;
+    const userId = req.user.id
+    const { productId, selectedWeight, quantity } = req.body
 
-    let cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-        cart = new Cart({ userId, items: [] });
+    // ─── Validation ──────────────────────────────
+    if (!productId || !selectedWeight || !quantity) {
+        throw new BadRequestError(
+            'productId, selectedWeight and quantity are required'
+        )
     }
 
-    const itemIndex = cart.items.findIndex(item => item.productId.toString() === productId);
+    if (quantity < 1) {
+        throw new BadRequestError('Quantity cannot be less than 1')
+    }
+
+    // ─── Cart Dhundo ya Banao ─────────────────────
+    let cart = await Cart.findOne({ userId })
+    if (!cart) {
+        cart = new Cart({ userId, items: [] })
+    }
+
+    // ─── Same product + Same weight check ────────
+    const itemIndex = cart.items.findIndex(item =>
+        item.productId.toString() === productId &&
+        item.selectedWeight.toString() === selectedWeight
+        //   ↑                              ↑
+        // productId match            selectedWeight bhi match
+    )
 
     if (itemIndex > -1) {
-        cart.items[itemIndex].quantity += quantity;
+        // ✅ Same product + Same weight → quantity badhao
+        cart.items[itemIndex].quantity += quantity
     } else {
-        cart.items.push({ productId, selectedWeight, quantity });
+        // ✅ Naya item — Different weight ya different product
+        cart.items.push({ productId, selectedWeight, quantity })
     }
 
-    await cart.save();
-    res.status(200).json({ message: 'Item added to cart successfully', data: cart });
-});
-
-const getCart = asyncHandler(async (req, res) => {
-    const userId = req.user.id
-
-    // ─── Cart fetch karo ─────────────────────────
-    const cart = await Cart.findOne({ userId })
-        .populate('items.productId',
-            'product_name brand flavor description imageDocumentId variantDocumentId'
-        )
-
-    if (!cart) {
-        throw new NotFoundError('Cart not found for the user')
-    }
-    
-
-    // ─── Har item ke liye image + variant fetch ───
-    const itemsWithDetails = await Promise.all(
-        cart.items.map(async (item) => {
-            const product = item.productId
-
-            // ── Step 1: Image fetch karo ──────────
-            // Product ki images field mein main
-            // document ka ID hai
-            const imageDocument = await ProductImage.findById(
-                product.imageDocumentId
-            ).select('images')
-
-            // Sirf pehli image chahiye cart ke liye
-            const firstImage = imageDocument?.images?.[0] || null
-
-            // ── Step 2: Variant fetch karo ────────
-            // Product ki variants field mein main
-            // document ka ID hai
-            const variantDocument = await ProductVariant.findById(
-                product.variantDocumentId
-            ).select('variants')
-
-            // Cart mein save variantId se
-            // specific variant dhundo
-            const selectedVariant = variantDocument?.variants.find(
-                v => v._id.toString() === item.selectedWeight.toString()
-            ) || null
-
-            // ── Step 3: Response format karo ──────
-            return {
-                cartItemId: item._id,
-                quantity: item.quantity,
-                product: {
-                    _id: product._id,
-                    product_name: product.product_name,
-                    brand: product.brand,
-                    flavor: product.flavor,
-                    description: product.description,
-
-                    // Sirf pehli image
-                    image: firstImage ? {
-                        image_url: firstImage.image_url,
-                    } : null,
-
-                    // Selected variant only
-                    variant: selectedVariant ? {
-                        weight: selectedVariant.weight,
-                        price: selectedVariant.price,
-                        mrp: selectedVariant.mrp,
-                        discount: selectedVariant.discount,
-                        sku: selectedVariant.sku
-                    } : null
-                }
-            }
-        })
-    )
+    await cart.save()
 
     res.status(200).json({
         success: true,
-        message: 'Cart fetched successfully',
-        data: {
-            _id: cart._id,
-            items: itemsWithDetails
-        }
+        message: 'Item added to cart successfully',
+        data: cart
     })
 })
+
+
+const getCart = asyncHandler(async (req, res) => {
+
+    const userId = req.user.id;
+
+    const {
+        cart,
+        giftCart,
+        catalogMap,
+        giftBoxMap,
+        giftWrapMap
+    } = await buildCartCatalog(userId);
+
+    const normalItems = buildNormalCart(
+        cart,
+        catalogMap
+    );
+
+    const giftItems = buildGiftCart(
+        giftCart,
+        catalogMap,
+        giftBoxMap,
+        giftWrapMap
+    );
+
+
+    res.status(200).json({
+
+        success: true,
+
+        items: [
+
+            ...normalItems,
+
+            ...giftItems
+
+        ]
+
+    });
+
+});
+
 
 const removeFromCart = asyncHandler(async (req, res) => {
     const userId = req.user.id;

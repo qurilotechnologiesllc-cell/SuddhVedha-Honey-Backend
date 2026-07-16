@@ -14,6 +14,7 @@ const addToGiftCart = asyncHandler(async (req, res) => {
         giftWrapId,
         customMessage = "",
         packingPrice,
+        quantity,
         products
     } = req.body;
 
@@ -112,11 +113,7 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
         customMessage,
 
-        packingPrice,
-
-        totalWeight,
-
-        totalAmount: calculatedTotalAmount,
+        quantity,
 
         products
 
@@ -146,7 +143,25 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
         message: "Gift added to cart successfully.",
 
-        data: giftCart
+        data: {
+
+            giftBoxId,
+
+            giftWrapId,
+
+            quantity,
+
+            customMessage,
+
+            products,
+
+            packingPrice,
+
+            totalWeight,
+
+            totalAmount: calculatedTotalAmount
+
+        }
 
     });
 

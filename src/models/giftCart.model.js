@@ -29,24 +29,16 @@ const giftCartSchema = new Schema({
                 default: ""
             },
 
-            packingPrice: {
+            quantity: {
                 type: Number,
-                default: 0
-            },
-
-            totalWeight: {
-                type: Number,
-                default: 0
-            },
-
-            totalAmount: {
-                type: Number,
+                default: 1,
                 required: true
             },
 
             products: [
 
                 {
+
                     _id: false,
 
                     productId: {
