@@ -358,7 +358,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"productId\": \"product-id-here\",\n  \"quantity\": 1\n}"
+                            "raw": "{\n  \"productId\": \"product-id-here\",\n  \"selectedWeight\": \"weight-id-here\",\n  \"quantity\": 1\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/cart/add",
@@ -369,6 +369,103 @@
                                 "api",
                                 "cart",
                                 "add"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Add Customized Gift Cart",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"giftBoxId\": \"gift-box-id-here\",\n  \"giftWrapId\": \"gift-wrap-id-here\",\n  \"customMessage\": \"Happy Birthday\",\n  \"quantity\": 1,\n  \"products\": [\n    {\n      \"productId\": \"product-id-here\",\n      \"selectedWeight\": \"weight-id-here\"\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/add/customize-product",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "add",
+                                "customize-product"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Increase Quantity",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"itemId\": \"cart-item-id-here\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/increase-quantity",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "increase-quantity"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Decrease Quantity",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Cookie",
+                                "value": "token={{token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"itemId\": \"cart-item-id-here\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/cart/decrease-quantity",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "cart",
+                                "decrease-quantity"
                             ]
                         }
                     },
@@ -390,7 +487,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"productId\": \"product-id-here\"\n}"
+                            "raw": "{\n  \"itemId\": \"cart-item-id-here\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/cart/remove",
