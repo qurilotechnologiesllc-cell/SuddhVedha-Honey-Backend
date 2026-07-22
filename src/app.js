@@ -19,6 +19,7 @@ const OfferRoutes = require('./routes/offerRoutes');
 const CouponRoutes = require('./routes/couponRoute');
 const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
 const OurlocationRoutes = require('./routes/ourlocationRoute');
+const UpcomingProductRoutes = require('./routes/upcomingProductsRoute')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -26,7 +27,17 @@ app.use(express.json());
 // Secret key — signed cookies ke liye
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-app.use(cors());
+app.use(cors({
+
+  origin: [
+    "http://localhost:3000",
+
+    "https://frontend-3000.devtunnels.ms"
+  ],
+
+  credentials: true
+
+}))
 
 // Sample route
 app.get('/', (req, res) => {
@@ -50,6 +61,7 @@ app.use('/api/admin', GiftBoxRoutes);
 app.use('/api/coupon', CouponRoutes);
 app.use('/api/benefits', honeyBenefitsRoutes);
 app.use('/api/location', OurlocationRoutes);
+app.use('/api/upcoming', UpcomingProductRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
