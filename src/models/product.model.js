@@ -8,35 +8,77 @@ const ProductSchema = new mongoose.Schema(
             trim: true
         },
 
-        slug: {
-            type: String,
-            unique: true,
-            index: true
-        },
-
         brand: {
             type: String,
-            default: "SudhVeda Honey"
+            default: "SudhVeda Honey",
+            trim: true
         },
 
-        flavor: {
+        product_type: {
             type: String,
-            required: true
+            required: true,
+            enum: ["honey", "gift-box"]
+        },
+
+        floral_source: {
+            type: String,
+            required: true,
+            trim: true
         },
 
         description: {
             type: String,
-            required: true
+            required: true,
+            trim: true
+        },
+
+        key_benefits: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        ingredients: {
+            type: String,
+            required: true,
+            trim: true
         },
 
         manufacturer_information: {
             type: String,
-            required: true
+            required: true,
+            trim: true
         },
 
-        average_rating: {
-            type: Number,
-            default: 0
+        shelf_life: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        storage_instructions: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        country_of_origin: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        fssai_license_number: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        batch_number: {
+            type: String,
+            unique: true,
+            index: true,
+            trim: true
         },
 
         total_reviews: {
@@ -44,9 +86,16 @@ const ProductSchema = new mongoose.Schema(
             default: 0
         },
 
+        average_rating: {
+            type: Number,
+            default: 0
+        },
+
+        // Existing references — unchanged
+
         categoryId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Category'
+            ref: "Category"
         },
 
         imageDocumentId: {
@@ -64,19 +113,21 @@ const ProductSchema = new mongoose.Schema(
             ref: "ProductVariant"
         },
 
-        reviews: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "ProductReview"
-        }],
+        reviews: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "ProductReview"
+            }
+        ],
 
         is_active: {
             type: Boolean,
             default: true
         }
-
     },
     {
         timestamps: true
-    });
+    }
+);
 
 module.exports = mongoose.model("Product", ProductSchema);

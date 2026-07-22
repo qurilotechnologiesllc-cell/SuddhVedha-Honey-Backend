@@ -195,59 +195,137 @@ const filterProductByRating = asyncHandler(async (req, res) => {
 
 const filterProductByQuantity = asyncHandler(async (req, res) => {
 
-    const { quantity } = req.query;
+    const { weight, unit } = req.query;
 
-    if (!quantity) {
-        throw new BadRequestError("Quantity is required.");
+
+    // ==========================================
+    // Basic Validation
+    // ==========================================
+
+    if (!weight || !unit) {
+        throw new BadRequestError(
+            "Weight and unit are required."
+        );
     }
 
-    const allowedQuantities = [
-        "100g",
-        "250g",
-        "500g",
-        "1kg",
-        "2kg"
+
+    // ==========================================
+    // Convert Weight To Number
+    // ==========================================
+
+    const numericWeight = Number(weight);
+
+    if (
+        !Number.isFinite(numericWeight) ||
+        numericWeight <= 0
+    ) {
+        throw new BadRequestError(
+            "Invalid weight."
+        );
+    }
+
+
+    // ==========================================
+    // Validate Unit
+    // ==========================================
+
+    const allowedUnits = [
+        "g",
+        "kg"
     ];
 
-    if (!allowedQuantities.includes(quantity)) {
-        throw new BadRequestError("Invalid quantity.");
+    if (!allowedUnits.includes(unit)) {
+        throw new BadRequestError(
+            "Invalid unit. Allowed units are g and kg."
+        );
     }
+
+
+    // ==========================================
+    // Find Variant Documents
+    // Weight + Unit Must Match Same Variant
+    // ==========================================
 
     const variantDocuments = await ProductVariant.find({
+
         variants: {
+
             $elemMatch: {
-                weight: quantity
+
+                weight: numericWeight,
+
+                unit: unit
+
             }
+
         }
+
     }).select("product");
 
+
+    // ==========================================
+    // No Product Found
+    // ==========================================
+
     if (!variantDocuments.length) {
+
         return res.status(200).json({
+
             success: true,
-            message: "No products found for this quantity.",
+
+            message: `No products found for ${numericWeight}${unit}.`,
+
             totalProducts: 0,
+
             data: []
+
         });
+
     }
 
-    const productIds = variantDocuments.map(item => item.product);
+
+    // ==========================================
+    // Extract Product IDs
+    // ==========================================
+
+    const productIds = variantDocuments.map(
+        item => item.product
+    );
+
+
+    // ==========================================
+    // Fetch Active Products
+    // ==========================================
 
     const products = await Product.find({
+
         _id: {
             $in: productIds
         },
+
         is_active: true
+
     })
         .populate("categoryId")
         .populate("variantDocumentId")
         .populate("imageDocumentId")
         .populate("videoDocumentId");
 
-    res.status(200).json({
+
+    // ==========================================
+    // Response
+    // ==========================================
+
+    return res.status(200).json({
 
         success: true,
 
         message: "Products fetched successfully.",
+
+        filter: {
+            weight: numericWeight,
+            unit
+        },
 
         totalProducts: products.length,
 

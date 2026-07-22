@@ -11,13 +11,15 @@ const reviewRoute = require('./routes/reviewRoute');
 const wishlistRoute = require('./routes/wishlistRoute');
 const categoryRoute = require('./routes/categoryRoute');
 const videoRoutes = require('./routes/videoRoute');
-const feedbackVideoRoutes = require('./routes/feedbackVideoRoute')
-const filterProductRoutes = require('./routes/filterProductRoute')
-const userEnquiryRoutes = require('./routes/userEnquiryRoutes')
-const GiftBoxRoutes = require('./routes/giftboxRoute')
-const GiftWrapRoutes = require('./routes/giftwarpRoute')
-const OfferRoutes = require('./routes/offerRoutes')
-const CouponRoutes = require('./routes/couponRoute')
+const feedbackVideoRoutes = require('./routes/feedbackVideoRoute');
+const filterProductRoutes = require('./routes/filterProductRoute');
+const userEnquiryRoutes = require('./routes/userEnquiryRoutes');
+const GiftBoxRoutes = require('./routes/giftboxRoute');
+const GiftWrapRoutes = require('./routes/giftwarpRoute');
+const OfferRoutes = require('./routes/offerRoutes');
+const CouponRoutes = require('./routes/couponRoute');
+const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
+const OurlocationRoutes = require('./routes/ourlocationRoute');
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -48,6 +50,8 @@ app.use('/api/offers', OfferRoutes);
 app.use('/api/admin', GiftBoxRoutes);
 app.use('/api/giftwrap', GiftWrapRoutes);
 app.use('/api/coupon', CouponRoutes);
+app.use('/api/benefits', honeyBenefitsRoutes);
+app.use('/api/location', OurlocationRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);

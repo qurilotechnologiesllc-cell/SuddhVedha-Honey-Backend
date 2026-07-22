@@ -6,30 +6,92 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToC
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
 const createProduct = asyncHandler(async (req, res) => {
-    const { product_name, slug, flavor, description, manufacturer_information, categoryId } = req.body
 
-    // Check if the product already exists
-    const existingProduct = await Product.findOne({ slug })
+    const {
+        product_name,
+        brand,
+        product_type,
+        floral_source,
+        description,
+        key_benefits,
+        ingredients,
+        manufacturer_information,
+        shelf_life,
+        storage_instructions,
+        country_of_origin,
+        fssai_license_number,
+        batch_number,
+        categoryId
+    } = req.body;
+
+
+    // -----------------------------------------
+    // Check Product With Same Batch Number
+    // -----------------------------------------
+
+    const existingProduct = await Product.findOne({
+        batch_number
+    });
+
     if (existingProduct) {
-        throw new ConflictError('Product with this slug already exists')
+        throw new ConflictError(
+            "Product with this batch number already exists."
+        );
     }
 
 
-    // Create the new product
-    const product = await Product.create({
-        product_name,
-        slug,
-        flavor,
-        description,
-        manufacturer_information,
-        categoryId
-    })
+    // -----------------------------------------
+    // Create Product
+    // -----------------------------------------
 
-    res.status(201).json({
+    const product = await Product.create({
+
+        product_name,
+
+        brand,
+
+        product_type,
+
+        floral_source,
+
+        description,
+
+        key_benefits,
+
+        ingredients,
+
+        manufacturer_information,
+
+        shelf_life,
+
+        storage_instructions,
+
+        country_of_origin,
+
+        fssai_license_number,
+
+        batch_number,
+
+        categoryId
+
+    });
+
+
+    // -----------------------------------------
+    // Response
+    // -----------------------------------------
+
+    return res.status(201).json({
+
         success: true,
+
+        message: "Product created successfully.",
+
         data: product
-    })
-})
+
+    });
+
+});
 
 const getAllProducts = asyncHandler(async (req, res) => {
     // 1. .lean() add kiya taaki hum data ko JS array ki tarah manipulate kar sakein
@@ -117,15 +179,15 @@ const getProductsByPagination = asyncHandler(async (req, res) => {
     // ─── Products Fetch karo ─────────────────────
     const products = await Product.find({ is_active: true })
         .populate({
-            path: 'images',
+            path: 'imageDocumentId',
             select: 'images -_id'
         })
         .populate({
-            path: 'variants',
+            path: 'variantDocumentId',
             select: 'variants -_id'
         })
         .populate({
-            path: 'category',
+            path: 'categoryId',
             select: 'category_name slug -_id'
         })
         .sort({ createdAt: -1 }) // Nayi products pehle
@@ -364,22 +426,132 @@ const createProductVariant = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
     const {
-        weight,
-        sku,
-        price,
         mrp,
-        discount
+        price,
+        discount_type,
+        tax,
+
+        sku,
+        barcode,
+
+        weight,
+        unit,
+
+        available_stock,
+        low_stock_alert,
+
+        stock_status,
+        allow_backorders
+
     } = req.body;
+
+
+    // ==========================================
+    // Validate Product
+    // ==========================================
 
     const product = await Product.findById(id);
 
     if (!product) {
-        throw new NotFoundError("Product not found");
+        throw new NotFoundError("Product not found.");
     }
+
+
+    // ==========================================
+    // Basic Pricing Validation
+    // ==========================================
+
+    if (Number(price) > Number(mrp)) {
+        throw new BadRequestError(
+            "Selling price cannot be greater than MRP."
+        );
+    }
+
+
+    // ==========================================
+    // Calculate You Save
+    // ==========================================
+
+    const calculatedYouSave =
+        Number(mrp) - Number(price);
+
+
+    // ==========================================
+    // Calculate Discount Value
+    // ==========================================
+
+    let calculatedDiscountValue = 0;
+
+    if (discount_type === "percentage") {
+
+        calculatedDiscountValue =
+            (calculatedYouSave / Number(mrp)) * 100;
+
+        calculatedDiscountValue =
+            Number(calculatedDiscountValue.toFixed(2));
+
+    } else if (discount_type === "fixed") {
+
+        calculatedDiscountValue =
+            Number(calculatedYouSave.toFixed(2));
+
+    }
+
+
+    // ==========================================
+    // Prepare Variant
+    // ==========================================
+
+    const newVariant = {
+
+        // Pricing
+        mrp: Number(mrp),
+
+        price: Number(price),
+
+        discount_type,
+
+        discount_value: calculatedDiscountValue,
+
+        you_save: Number(calculatedYouSave.toFixed(2)),
+
+        tax,
+
+
+        // Inventory
+        sku,
+
+        barcode: barcode || null,
+
+        weight: Number(weight),
+
+        unit,
+
+        available_stock: Number(available_stock),
+
+        low_stock_alert: Number(low_stock_alert),
+
+        stock_status,
+
+        allow_backorders:
+            allow_backorders === true ||
+            allow_backorders === "true"
+
+    };
+
+
+    // ==========================================
+    // Find Existing Variant Document
+    // ==========================================
 
     let variantDoc = await ProductVariant.findOne({
         product: id
     });
+
+
+    // ==========================================
+    // First Variant Of Product
+    // ==========================================
 
     if (!variantDoc) {
 
@@ -387,60 +559,96 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
             product: id,
 
-            variants: [{
-
-                weight,
-
-                sku,
-
-                price,
-
-                mrp,
-
-                discount
-
-            }]
+            variants: [
+                newVariant
+            ]
 
         });
+
+
+        // Save ProductVariant document reference
+        // inside Product document
 
         product.variantDocumentId = variantDoc._id;
 
         await product.save();
 
-    } else {
+    }
 
-        const alreadyExists =
-            variantDoc.variants.find(
-                item => item.weight === weight
-            );
+
+    // ==========================================
+    // Product Already Has Variants
+    // ==========================================
+
+    else {
+
+        // --------------------------------------
+        // Check Weight + Unit
+        // --------------------------------------
+
+        const alreadyExists = variantDoc.variants.find(
+
+            item =>
+                Number(item.weight) === Number(weight) &&
+                item.unit === unit
+
+        );
+
 
         if (alreadyExists) {
+
             throw new BadRequestError(
-                "Variant already exists."
+                `Variant ${weight}${unit} already exists.`
             );
+
         }
 
-        variantDoc.variants.push({
 
-            weight,
+        // --------------------------------------
+        // Check Duplicate SKU
+        // --------------------------------------
 
-            sku,
+        const skuExists = variantDoc.variants.find(
 
-            price,
+            item =>
+                item.sku.toLowerCase() ===
+                sku.toLowerCase()
 
-            mrp,
+        );
 
-            discount
 
-        });
+        if (skuExists) {
+
+            throw new BadRequestError(
+                "Variant with this SKU already exists."
+            );
+
+        }
+
+
+        // --------------------------------------
+        // Add New Variant
+        // --------------------------------------
+
+        variantDoc.variants.push(
+            newVariant
+        );
+
 
         await variantDoc.save();
 
     }
 
-    res.status(201).json({
+
+    // ==========================================
+    // Response
+    // ==========================================
+
+    return res.status(201).json({
 
         success: true,
+
+        message: "Product variant created successfully.",
 
         data: variantDoc
 
@@ -450,66 +658,185 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
 const updateProductVariant = asyncHandler(async (req, res) => {
 
-    const { productId, variantId } = req.params
-    const { price, mrp, discount } = req.body
+    const { productId, variantId } = req.params;
 
-    // ─── Kuch update karne ko hai? ───────────────
-    if (price === undefined && mrp === undefined && discount === undefined) {
+    const {
+        price,
+        mrp,
+        available_stock,
+        low_stock_alert
+    } = req.body;
+
+
+    // ==========================================
+    // At Least One Field Required
+    // ==========================================
+
+    if (
+        price === undefined &&
+        mrp === undefined &&
+        available_stock === undefined &&
+        low_stock_alert === undefined
+    ) {
         throw new BadRequestError(
-            'At least one field required: price, mrp or discount'
-        )
+            "At least one field is required: price, mrp, available_stock or low_stock_alert."
+        );
     }
 
-    // ─── Product Variant Document Dhundo ─────────
+
+    // ==========================================
+    // Find Product Variant Document
+    // ==========================================
+
     const variantDocument = await ProductVariant.findOne({
         product: productId
-    })
+    });
 
     if (!variantDocument) {
-        throw new NotFoundError('Product variant not found')
+        throw new NotFoundError(
+            "Product variant document not found."
+        );
     }
 
-    // ─── Variant ID se find karo ─────────────────
-    const variant = variantDocument.variants.find(
-        item => item._id.toString() === variantId
-        //            ↑
-        // ObjectId ko string mein convert karo
-        // phir compare karo
-    )
+
+    // ==========================================
+    // Find Particular Variant
+    // ==========================================
+
+    const variant = variantDocument.variants.id(variantId);
 
     if (!variant) {
         throw new NotFoundError(
-            'Variant not found with this ID'
-        )
+            "Variant not found with this ID."
+        );
     }
 
-    // ─── Sirf jo fields aaye hain update karo ────
-    if (price !== undefined) variant.price = Number(price)
-    if (mrp !== undefined) variant.mrp = Number(mrp)
-    if (discount !== undefined) variant.discount = Number(discount)
 
-    // ─── Price/MRP Validation ─────────────────────
+    // ==========================================
+    // Update Only Allowed Fields
+    // ==========================================
+
+    if (price !== undefined) {
+        variant.price = Number(price);
+    }
+
+    if (mrp !== undefined) {
+        variant.mrp = Number(mrp);
+    }
+
+    if (available_stock !== undefined) {
+        variant.available_stock = Number(available_stock);
+    }
+
+    if (low_stock_alert !== undefined) {
+        variant.low_stock_alert = Number(low_stock_alert);
+    }
+
+
+    // ==========================================
+    // Price Validation
+    // ==========================================
+
+    if (variant.price < 0 || variant.mrp < 0) {
+        throw new BadRequestError(
+            "Price and MRP cannot be negative."
+        );
+    }
+
     if (variant.price > variant.mrp) {
         throw new BadRequestError(
-            'Price cannot be greater than MRP'
-        )
+            "Selling price cannot be greater than MRP."
+        );
     }
 
-    // ─── Discount Validation ──────────────────────
-    if (variant.discount < 0 || variant.discount > 100) {
+
+    // ==========================================
+    // Inventory Validation
+    // ==========================================
+
+    if (variant.available_stock < 0) {
         throw new BadRequestError(
-            'Discount must be between 0 and 100'
-        )
+            "Available stock cannot be negative."
+        );
     }
 
-    await variantDocument.save()
+    if (variant.low_stock_alert < 0) {
+        throw new BadRequestError(
+            "Low stock alert cannot be negative."
+        );
+    }
 
-    res.status(200).json({
+
+    // ==========================================
+    // Recalculate Discount
+    // ==========================================
+
+    const youSave =
+        Number(variant.mrp) - Number(variant.price);
+
+    variant.you_save =
+        Number(youSave.toFixed(2));
+
+
+    // Percentage discount
+    if (variant.discount_type === "percentage") {
+
+        const discountPercentage =
+            variant.mrp > 0
+                ? (youSave / variant.mrp) * 100
+                : 0;
+
+        variant.discount_value =
+            Number(discountPercentage.toFixed(2));
+
+    }
+
+    // Fixed discount
+    else if (variant.discount_type === "fixed") {
+
+        variant.discount_value =
+            Number(youSave.toFixed(2));
+
+    }
+
+
+    // ==========================================
+    // Automatically Update Stock Status
+    // ==========================================
+
+    if (variant.available_stock > 0) {
+
+        variant.stock_status = "in_stock";
+
+    } else {
+
+        variant.stock_status = "out_of_stock";
+
+    }
+
+
+    // ==========================================
+    // Save
+    // ==========================================
+
+    await variantDocument.save();
+
+
+    // ==========================================
+    // Response
+    // ==========================================
+
+    return res.status(200).json({
+
         success: true,
-        message: 'Product variant updated successfully',
+
+        message: "Product variant updated successfully.",
+
         data: variant
-    })
-})
+
+    });
+
+});
 
 
 module.exports = {

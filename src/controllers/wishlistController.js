@@ -84,14 +84,14 @@ const getWishlist = asyncHandler(async (req, res) => {
             path: 'products.productId',
             populate: [
                 {
-                    path: 'images',
+                    path: 'imageDocumentId',
                     model: 'ProductImage',   // ← Model name explicitly do
-                    select: 'image_url -_id'
+                    select: 'images -_id'
                 },
                 {
-                    path: 'variants',
+                    path: 'variantDocumentId',
                     model: 'ProductVariant', // ← Model name explicitly do
-                    select: 'price mrp discount quantity -_id'
+                    select: 'variants -_id'
                 }
             ]
         })
