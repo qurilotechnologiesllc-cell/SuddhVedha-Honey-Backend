@@ -6,9 +6,7 @@ const buildGiftCart = (
 
     catalogMap,
 
-    giftBoxMap,
-
-    giftWrapMap
+    giftBoxMap
 
 ) => {
 
@@ -22,10 +20,6 @@ const buildGiftCart = (
 
         const giftBox = giftBoxMap.get(
             item.giftBoxId.toString()
-        );
-
-        const giftWrap = giftWrapMap.get(
-            item.giftWrapId?.toString()
         );
 
         const {
@@ -44,9 +38,7 @@ const buildGiftCart = (
 
             catalogMap,
 
-            giftBoxMap,
-
-            giftWrapMap
+            giftBoxMap
 
         );
 
@@ -67,17 +59,9 @@ const buildGiftCart = (
 
                     name: giftBox.name,
 
-                    image: giftBox.image
+                    image: giftBox.image,
 
-                }
-                : null,
-
-            giftWrap: giftWrap
-                ? {
-
-                    _id: giftWrap._id,
-
-                    color: giftWrap.color
+                    price: giftBox.price
 
                 }
                 : null,

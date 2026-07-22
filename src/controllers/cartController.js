@@ -4,7 +4,6 @@ const ProductImage = require('../models/productImage.model')
 const ProductVariant = require('../models/productVariant.model')
 const Product = require('../models/product.model')
 const GiftBox = require('../models/giftBox.model')
-const GiftWrap = require('../models/giftWrap.model')
 const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } = require('../errors/errorConfig')
 
 const { buildCartCatalog } = require('../services/cartCatalog.service')
@@ -64,7 +63,6 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
     const {
         giftBoxId,
-        giftWrapId,
         customMessage = "",
         quantity,
         products
@@ -77,7 +75,7 @@ const addToGiftCart = asyncHandler(async (req, res) => {
     // Basic Validation
     // -----------------------------
 
-    if (!giftBoxId || !giftWrapId) {
+    if (!giftBoxId) {
         throw new BadRequestError("Gift Box and Gift Wrap is required.");
     }
 
@@ -90,15 +88,6 @@ const addToGiftCart = asyncHandler(async (req, res) => {
         calculatedTotalAmount += giftBox.price
     }
 
-    if (giftWrapId) {
-
-        const giftWrap = await GiftWrap.findById(giftWrapId);
-
-        if (!giftWrap) {
-            throw new NotFoundError("Gift Wrap not found.");
-        }
-        calculatedTotalAmount += giftWrap.price
-    }
 
     if (!products || !Array.isArray(products) || products.length === 0) {
         throw new BadRequestError("Please select at least one honey.");
@@ -157,8 +146,6 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
         giftBoxId,
 
-        giftWrapId,
-
         customMessage,
 
         quantity,
@@ -195,8 +182,6 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
             giftBoxId,
 
-            giftWrapId,
-
             quantity,
 
             customMessage,
@@ -221,8 +206,7 @@ const getCart = asyncHandler(async (req, res) => {
         cart,
         giftCart,
         catalogMap,
-        giftBoxMap,
-        giftWrapMap
+        giftBoxMap
     } = await buildCartCatalog(userId);
 
     const normalItems = buildNormalCart(
@@ -233,8 +217,7 @@ const getCart = asyncHandler(async (req, res) => {
     const giftItems = buildGiftCart(
         giftCart,
         catalogMap,
-        giftBoxMap,
-        giftWrapMap
+        giftBoxMap
     );
 
 

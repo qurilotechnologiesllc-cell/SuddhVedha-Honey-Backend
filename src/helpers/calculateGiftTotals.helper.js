@@ -1,8 +1,7 @@
 const calculateGiftTotals = (
     giftItem,
     catalogMap,
-    giftBoxMap,
-    giftWrapMap
+    giftBoxMap
 ) => {
 
     let totalWeight = 0;
@@ -12,19 +11,9 @@ const calculateGiftTotals = (
         giftItem.giftBoxId.toString()
     );
 
-    const giftWrap = giftWrapMap.get(
-        giftItem.giftWrapId?.toString()
-    );
-
     if (giftBox) {
 
         totalAmount += giftBox.price;
-
-    }
-
-    if (giftWrap) {
-
-        totalAmount += giftWrap.price;
 
     }
 
@@ -91,11 +80,7 @@ const calculateGiftTotals = (
 
         totalWeight,
 
-        packingPrice:
-
-            (giftBox?.price || 0) +
-
-            (giftWrap?.price || 0),
+        packingPrice: giftBox?.price || 0,
 
         totalAmount
 

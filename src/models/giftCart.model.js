@@ -18,12 +18,6 @@ const giftCartSchema = new Schema({
                 required: true
             },
 
-            giftWrapId: {
-                type: Schema.Types.ObjectId,
-                ref: "GiftWrap",
-                default: null
-            },
-
             customMessage: {
                 type: String,
                 default: ""

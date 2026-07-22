@@ -6,8 +6,6 @@ const ProductImage = require("../models/productImage.model");
 const ProductVariant = require("../models/productVariant.model");
 
 const GiftBox = require("../models/giftBox.model");
-const GiftWrap = require("../models/giftWrap.model");
-
 
 const buildCartCatalog = async (userId) => {
 
@@ -29,7 +27,6 @@ const buildCartCatalog = async (userId) => {
 
     const productIds = new Set();
     const giftBoxIds = new Set();
-    const giftWrapIds = new Set();
 
     // Normal Cart
 
@@ -52,12 +49,6 @@ const buildCartCatalog = async (userId) => {
             if (item.giftBoxId) {
 
                 giftBoxIds.add(item.giftBoxId.toString());
-
-            }
-
-            if (item.giftWrapId) {
-
-                giftWrapIds.add(item.giftWrapId.toString());
 
             }
 
@@ -112,9 +103,7 @@ const buildCartCatalog = async (userId) => {
 
         variants,
 
-        giftBoxes,
-
-        giftWraps
+        giftBoxes
 
     ] = await Promise.all([
 
@@ -143,16 +132,6 @@ const buildCartCatalog = async (userId) => {
             _id: {
 
                 $in: [...giftBoxIds]
-
-            }
-
-        }).lean(),
-
-        GiftWrap.find({
-
-            _id: {
-
-                $in: [...giftWrapIds]
 
             }
 
@@ -221,18 +200,6 @@ const buildCartCatalog = async (userId) => {
     });
 
     // -----------------------------
-    // Gift Wrap Map
-    // -----------------------------
-
-    const giftWrapMap = new Map();
-
-    giftWraps.forEach(wrap => {
-
-        giftWrapMap.set(wrap._id.toString(), wrap);
-
-    });
-
-    // -----------------------------
     // Return
     // -----------------------------
 
@@ -244,9 +211,7 @@ const buildCartCatalog = async (userId) => {
 
         catalogMap,
 
-        giftBoxMap,
-
-        giftWrapMap
+        giftBoxMap
 
     };
 
