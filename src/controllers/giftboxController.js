@@ -8,7 +8,7 @@ const {
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
 const addGiftBox = asyncHandler(async (req, res) => {
-    const { name, description, price, sortOrder } = req.body
+    const { name, description, price, box_type } = req.body
 
     // ─── Validation ─────────────────────────────
     if (!name || !price) {
@@ -48,7 +48,7 @@ const addGiftBox = asyncHandler(async (req, res) => {
         price: Number(price),
         image: result.secure_url,
         public_id: result.public_id,  // Delete ke liye
-        sortOrder: Number(sortOrder) || 0,
+        box_type,
         isActive: true
     })
 
@@ -64,7 +64,7 @@ const getAllGiftBoxes = asyncHandler(async (req, res) => {
     // ─── Sirf Active boxes dikhao users ko ──────
     const giftBoxes = await GiftBox.find({ isActive: true })
         .select('-createdBy -__v')  // Admin info hide karo
-        .sort({ sortOrder: 1, createdAt: -1 })
+        .sort({ createdAt: -1 })
 
 
     if (!giftBoxes.length) {

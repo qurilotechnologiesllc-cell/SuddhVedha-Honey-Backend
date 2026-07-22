@@ -31,7 +31,7 @@ const uploadProductVideo = asyncHandler(async (req, res) => {
 
     const result = await uploadVideoToCloudinary(
         req.file.buffer,
-        "videos"
+        "productvideos"
     );
 
     if (!result) {

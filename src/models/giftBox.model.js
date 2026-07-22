@@ -19,7 +19,7 @@ const giftBoxSchema = new mongoose.Schema(
             required: [true, "Gift box image is required."],
         },
 
-        public_id:{
+        public_id: {
             type: String,
             required: [true, "Image public id is required."],
         },
@@ -30,15 +30,16 @@ const giftBoxSchema = new mongoose.Schema(
             min: [0, "Price cannot be negative."],
         },
 
+        box_type: {
+            type: String,
+            enum: ['small', 'medium', 'large'],
+            default: 'small'
+        },
+
         isActive: {
             type: Boolean,
             default: true,
-        },
-
-        sortOrder: {
-            type: Number,
-            default: 0,
-        },
+        }
     },
     {
         timestamps: true,
