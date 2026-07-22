@@ -22,7 +22,8 @@ const generateToken = (user) => {
     const payload = {
         id: user._id,
         name: user.name,
-        mobile: user.mobile
+        mobile: user.mobile,
+        role: user.role
     };
 
     const token = JWT.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' }); // Token valid for 1 hour

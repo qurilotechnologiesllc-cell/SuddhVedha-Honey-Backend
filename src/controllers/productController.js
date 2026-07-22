@@ -1,6 +1,7 @@
 const Product = require('../models/product.model')
 const ProductImage = require("../models/productImage.model")
 const ProductVariant = require('../models/productVariant.model')
+const cloudinary = require('../config/cloudinary')
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, ConflictError, ValidationError } = require('../errors/errorConfig')
@@ -107,10 +108,6 @@ const getAllProducts = asyncHandler(async (req, res) => {
         .populate({
             path: 'variantDocumentId',
             select: 'variants -_id'
-        })
-        .populate({
-            path: 'reviews',
-            select: 'rating review -_id'
         })
         .select('-createdAt -updatedAt -__v')
         .lean(); // <-- Super Important!
@@ -231,6 +228,10 @@ const getProductById = asyncHandler(async (req, res) => {
             path: 'reviews',
             select: 'rating review -_id'
         })
+        .populate({
+            path: 'videoDocumentId',
+            select: 'videos -_id'
+        })
         .select('-createdAt -updatedAt -__v')
         .lean(); // <-- Important for modifying the object
 
@@ -239,20 +240,65 @@ const getProductById = asyncHandler(async (req, res) => {
     }
 
     // 2. Single image aur single variant nikalne ka logic
-    let singleImage = null;
-    let singleVariant = null;
+    let productImages = null;
+    let productVariants = null;
+    let productvideos = null;
 
     if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
-        singleImage = product.imageDocumentId.images;
+        productImages = product.imageDocumentId.images;
     }
 
     if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
-        singleVariant = product.variantDocumentId.variants;
+        productVariants = product.variantDocumentId.variants;
     }
 
+    if (product.videoDocumentId && product.videoDocumentId.videos && product.videoDocumentId.videos.length > 0) {
+        productvideos = product.videoDocumentId.videos;
+    }
+
+    const videoData = productvideos?.map((video) => {
+    
+            const videoUrl = cloudinary.url(video.public_id, {
+                resource_type: "video",
+                secure: true
+            });
+    
+            const thumbnailUrl = cloudinary.url(video.public_id, {
+                resource_type: "video",
+                secure: true,
+                format: "jpg",
+                transformation: [
+                    {
+                        start_offset: "2"
+                    },
+                    {
+                        width: 500,
+                        crop: "fill"
+                    }
+                ]
+            });
+    
+            return {
+    
+                _id: video._id,
+    
+                duration: video.duration,
+    
+                format: video.format,
+    
+                video_url: videoUrl,
+    
+                thumbnail_url: thumbnailUrl
+    
+            };
+    
+        });
+    
+
     // 3. Original objects ko flat single object se replace kar diya
-    product.imageDocumentId = singleImage;
-    product.variantDocumentId = singleVariant;
+    product.imageDocumentId = productImages;
+    product.variantDocumentId = productVariants;
+    product.videoDocumentId = videoData
 
     res.status(200).json({
         success: true,

@@ -4,6 +4,7 @@ const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, Forbidd
 const sendOtp = require('../utils/sendOtp');
 const redis = require('../utils/redis');
 const { generateToken } = require('../middlewares/authmiddleware');
+const bcrypt = require('bcrypt')
 
 const generateOtp = () => {
     return Math.floor(1000 + Math.random() * 9000).toString(); // Generates a 4-digit OTP
@@ -11,6 +12,13 @@ const generateOtp = () => {
 
 const createUser = asyncHandler(async (req, res) => {
     const { name, mobile } = req.body;
+
+    const mobileRegex = /^[6-9][0-9]{9}$/
+    if (!mobileRegex.test(mobile)) {
+        throw new BadRequestError(
+            'Invalid mobile number. Must be 10 digits starting with 6-9'
+        )
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ mobile });
@@ -108,8 +116,10 @@ const loginUser = asyncHandler(async (req, res) => {
         300 // 5 min
     );
 
+    console.log(otp);
+
     // OTP bhejo
-    await sendOtp(mobile, otp);
+    // await sendOtp(mobile, otp);
 
     res.status(200).json({
         success: true,
@@ -171,5 +181,95 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
     });
 });
 
+const updateUserProfile = asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    const { email, gender, DOB, password } = req.body
 
-module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp };
+    // ─── User Dhundo ──────────────────────────────
+    const user = await User.findById(userId)
+    if (!user) {
+        throw new NotFoundError('User not found')
+    }
+
+    // ─── Kuch Update Karne Ko Hai? ───────────────
+    if (!email && !gender && !DOB && !password) {
+        throw new BadRequestError(
+            'At least one field required: email, gender, DOB or password'
+        )
+    }
+
+    // ─── Email Validation ─────────────────────────
+    if (email) {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+        if (!emailRegex.test(email)) {
+            throw new BadRequestError('Invalid email address')
+        }
+        if (email.length > 80) {
+            throw new BadRequestError('Email cannot exceed 80 characters')
+        }
+
+        // Duplicate email check
+        const emailExists = await User.findOne({
+            email: email.toLowerCase().trim(),
+            _id: { $ne: userId }  // Apne aap ko exclude karo
+        })
+        if (emailExists) {
+            throw new ConflictError('Email already in use by another user')
+        }
+
+        user.email = email.toLowerCase().trim()
+    }
+
+    // ─── Gender Validation ────────────────────────
+    if (gender) {
+        const allowedGenders = ['male', 'female', 'other']
+        if (!allowedGenders.includes(gender.toLowerCase())) {
+            throw new BadRequestError(
+                'Gender must be male, female or other'
+            )
+        }
+        user.gender = gender.toLowerCase()
+    }
+
+    // ─── DOB Validation ───────────────────────────
+    if (DOB) {
+        const dobRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/
+        if (!dobRegex.test(DOB)) {
+            throw new BadRequestError(
+                'Invalid DOB format. Use DD/MM/YYYY e.g. 15/08/1995'
+            )
+        }
+        user.DOB = DOB
+    }
+
+    // ─── Password Hash ────────────────────────────
+    if (password) {
+        if (password.length < 6) {
+            throw new BadRequestError(
+                'Password must be at least 6 characters'
+            )
+        }
+        const salt = await bcrypt.genSalt(10)
+        user.password = await bcrypt.hash(password, salt)
+    }
+
+    // ─── Save karo ───────────────────────────────
+    await user.save()
+
+    res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: {
+            _id: user._id,
+            name: user.name,
+            mobile: user.mobile,
+            email: user.email || null,
+            gender: user.gender || null,
+            DOB: user.DOB || null,
+            role: user.role
+        }
+    })
+})
+
+
+module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile };
