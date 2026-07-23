@@ -225,10 +225,6 @@ const getProductById = asyncHandler(async (req, res) => {
             select: 'variants -_id'
         })
         .populate({
-            path: 'reviews',
-            select: 'rating review -_id'
-        })
-        .populate({
             path: 'videoDocumentId',
             select: 'videos -_id'
         })

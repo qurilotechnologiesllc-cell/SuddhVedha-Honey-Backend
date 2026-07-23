@@ -1,73 +1,128 @@
 const ProductReview = require('../models/productReview.model');
-const Product = require('../models/product.model');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
-const { asyncHandler, NotFoundError, BadRequestError, UnauthorizedError, ForbiddenError, ConflictError } = require('../errors/errorConfig')
+const { asyncHandler, NotFoundError, BadRequestError, UnauthorizedError, ForbiddenError, ConflictError, ServiceUnavailableError } = require('../errors/errorConfig')
 
 const createProductReview = asyncHandler(async (req, res) => {
-    const { productId, rating, review } = req.body;
-    const userId = req.user.id;
 
-    // Update the product's average rating and total reviews
-    const product = await Product.findById(productId);
-    if (!product) {
-        throw new NotFoundError('Product not found.');
+    const {
+        fullname,
+        rating,
+        review,
+        role
+    } = req.body;
+
+    let profile_url = "";
+    let public_id = "";
+
+    // -----------------------------
+    // Upload Profile Image (Optional)
+    // -----------------------------
+
+    if (req.file) {
+
+        const uploadedImage = await uploadToCloudinary(
+            req.file.buffer,
+            "sudhvedahoney/clientImage"
+        );
+
+        profile_url = uploadedImage.secure_url;
+        public_id = uploadedImage.public_id;
+
     }
 
-    // Check if the user has already reviewed this product
-    const existingReview = await ProductReview.findOne({ product: productId, user: userId });
-    if (existingReview) {
-        throw new ConflictError('You have already reviewed this product.');
-    }
+    // -----------------------------
+    // Create Review
+    // -----------------------------
 
     const newReview = await ProductReview.create({
-        product: productId,
-        user: userId,
+
+        fullname,
+
         rating,
-        review
+
+        review,
+
+        role,
+
+        profile_url,
+
+        public_id
+
     });
 
-    product.reviews.push(newReview._id);
-    product.total_reviews += 1;
-    product.average_rating = (product.average_rating * (product.total_reviews - 1) + rating) / product.total_reviews;
-    await product.save();
+    res.status(201).json({
 
-    res.status(201).json({ message: 'Product review created successfully', review: newReview });
+        success: true,
+
+        message: "Product review created successfully.",
+
+        data: newReview
+
+    });
+
 });
 
 const removeProductReview = asyncHandler(async (req, res) => {
+
     const { reviewId } = req.params;
-    const userId = req.user.id;
 
     const review = await ProductReview.findById(reviewId);
+
     if (!review) {
-        throw new NotFoundError('Review not found.');
+        throw new NotFoundError("Review not found.");
     }
 
-    // Check if the user is the owner of the review
-    if (review.user.toString() !== userId) {
-        throw new ForbiddenError('You are not authorized to delete this review.');
-    }
+    // -----------------------------
+    // Delete Image From Cloudinary
+    // -----------------------------
 
-    // Update the product's average rating and total reviews
-    const product = await Product.findById(review.product);
+    if (review.public_id) {
 
-    if (product) {
-        product.reviews.pull(review._id);
-        product.total_reviews -= 1;
-        if (product.total_reviews > 0) {
-            product.average_rating = (product.average_rating * (product.total_reviews + 1) - review.rating) / product.total_reviews;
-        } else {
-            product.average_rating = 0;
+        const result = await deleteFromCloudinary(review.public_id);
+        if (!result) {
+            throw new ServiceUnavailableError('Service failed!')
         }
-        await product.save();
+
     }
 
     await ProductReview.findByIdAndDelete(reviewId);
 
-    res.status(200).json({ message: 'Product review removed successfully' });
+    // -----------------------------
+    // Response
+    // -----------------------------
+
+    res.status(200).json({
+
+        success: true,
+
+        message: "Product review removed successfully."
+
+    });
+
+});
+
+const getallReviews = asyncHandler(async (req, res) => {
+
+    const reviews = await ProductReview.find()
+        .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+
+        success: true,
+
+        message: "Reviews fetched successfully.",
+
+        totalReviews: reviews.length,
+
+        data: reviews
+
+    });
+
 });
 
 module.exports = {
     createProductReview,
-    removeProductReview
+    removeProductReview,
+    getallReviews
 };

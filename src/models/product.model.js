@@ -81,16 +81,6 @@ const ProductSchema = new mongoose.Schema(
             trim: true
         },
 
-        total_reviews: {
-            type: Number,
-            default: 0
-        },
-
-        average_rating: {
-            type: Number,
-            default: 0
-        },
-
         // Existing references — unchanged
 
         categoryId: {
@@ -112,13 +102,6 @@ const ProductSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "ProductVariant"
         },
-
-        reviews: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "ProductReview"
-            }
-        ],
 
         is_active: {
             type: Boolean,

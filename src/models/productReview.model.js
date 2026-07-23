@@ -2,15 +2,9 @@ const mongoose = require("mongoose");
 
 const ProductReviewSchema = new mongoose.Schema({
 
-    product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: true
-    },
-
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+    fullname: {
+        type: String,
+        require: true
     },
 
     rating: {
@@ -20,6 +14,21 @@ const ProductReviewSchema = new mongoose.Schema({
     },
 
     review: {
+        type: String,
+        required: true,
+    },
+
+    profile_url: {
+        type: String,
+        default: ''
+    },
+
+    public_id: {
+        type: String,
+        default: ''
+    },
+
+    role: {
         type: String
     }
 
