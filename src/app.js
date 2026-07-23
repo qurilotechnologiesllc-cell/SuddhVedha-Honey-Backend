@@ -19,7 +19,10 @@ const OfferRoutes = require('./routes/offerRoutes');
 const CouponRoutes = require('./routes/couponRoute');
 const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
 const OurlocationRoutes = require('./routes/ourlocationRoute');
-const UpcomingProductRoutes = require('./routes/upcomingProductsRoute')
+const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
+
+// Now from there its start the admin routes 
+const adminAuthRoutes = require('./routes/adminAuthRoute')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -62,6 +65,9 @@ app.use('/api/coupon', CouponRoutes);
 app.use('/api/benefits', honeyBenefitsRoutes);
 app.use('/api/location', OurlocationRoutes);
 app.use('/api/upcoming', UpcomingProductRoutes);
+
+// Admin Routes
+app.use('/api/admin', adminAuthRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);

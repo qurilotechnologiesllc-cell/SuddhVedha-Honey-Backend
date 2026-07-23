@@ -79,7 +79,12 @@ const verifyOtp = asyncHandler(async (req, res) => {
     // Redis se OTP aur temp data delete karo
     await redis.del(`tempuser:${verificationId}`);
 
-    const token = generateToken(newUser);
+    const token = generateToken({
+        id: newUser._id,
+        email: newUser.name,
+        username: newUser.mobile,
+        role: newUser.role
+    });
 
     res.cookie('token', token, {
         httpOnly: true,
@@ -159,7 +164,12 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
         throw new NotFoundError('User with this mobile number does not exist');
     }
 
-    const token = generateToken(existingUser);
+    const token = generateToken({
+        id: existingUser._id,
+        email: existingUser.name,
+        username: existingUser.mobile,
+        role: existingUser.role
+    });
 
     res.cookie("token", token, {
         httpOnly: true,

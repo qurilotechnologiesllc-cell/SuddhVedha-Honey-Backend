@@ -1,5 +1,5 @@
 const Enquiry = require('../models/userEnquiry.model')
-const sendThankYouEmail = require('../utils/sendEmail')
+const { sendThankYouEmail } = require('../utils/sendEmail')
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ConflictError, ServiceUnavailableError } = require('../errors/errorConfig')
 
 const submituserEnquiry = asyncHandler(async (req, res) => {
