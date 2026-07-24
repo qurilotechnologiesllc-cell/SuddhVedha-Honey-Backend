@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middlewares/authmiddleware')
-const { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile } = require('../controllers/userAuthController');
+const { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile, getUserProfile } = require('../controllers/userAuthController');
 
 // Route to create a new user
 router.post('/create', createUser);
@@ -16,5 +16,7 @@ router.post('/login', loginUser);
 router.post('/verify-login-otp', verifyLoginOtp);
 
 router.put('/update/profile', authMiddleware, updateUserProfile)
+
+router.get('/profile-details', authMiddleware, getUserProfile)
 
 module.exports = router;

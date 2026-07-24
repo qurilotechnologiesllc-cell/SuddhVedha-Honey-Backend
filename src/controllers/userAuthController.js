@@ -125,7 +125,6 @@ const loginUser = asyncHandler(async (req, res) => {
     // await sendOtp(mobile, otp);
 
     console.log(otp);
-    
 
     res.status(200).json({
         success: true,
@@ -282,5 +281,30 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     })
 })
 
+const getUserProfile = asyncHandler(async (req, res) => {
+    const { role } = req.user
 
-module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile };
+    if (role !== 'user') {
+        throw new BadRequestError(`role is not user : ${role}`)
+    }
+    const userId = req.user.id
+
+    // ─── Token se userId lekar User dhundo ───────
+    const user = await User.findById(userId)
+        .select('-role -password -__v')
+    // ↑ Role, password, __v hide karo
+
+    if (!user) {
+        throw new NotFoundError('User not found')
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'User profile fetched successfully',
+        data: user
+    })
+})
+
+
+
+module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile, getUserProfile };
