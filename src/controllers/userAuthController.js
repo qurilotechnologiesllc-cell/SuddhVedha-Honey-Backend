@@ -89,7 +89,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
     res.cookie('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'none',
         signed: true,
         maxAge: 7 * 24 * 60 * 60 * 1000
     })
@@ -174,8 +174,8 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
 
     res.cookie("token", token, {
         httpOnly: true,
-        secure: false,          // testing ke liye
-        sameSite: "strict",
+        secure: true,          // testing ke liye
+        sameSite: "none",
         signed: true,
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
