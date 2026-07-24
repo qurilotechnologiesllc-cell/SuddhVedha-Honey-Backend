@@ -121,10 +121,8 @@ const loginUser = asyncHandler(async (req, res) => {
         300 // 5 min
     );
 
-    console.log(otp);
-
     // OTP bhejo
-    // await sendOtp(mobile, otp);
+    await sendOtp(mobile, otp);
 
     res.status(200).json({
         success: true,
