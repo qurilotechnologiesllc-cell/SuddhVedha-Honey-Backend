@@ -1,6 +1,7 @@
 const express = require('express');
 const app = express();
 const cors = require('cors');
+const path = require('path')
 const cookieParser = require('cookie-parser');
 const { notFoundHandler, errorHandler } = require('./errors/errorConfig');
 const userAuthRoute = require('./routes/userAuthRoute');
@@ -20,7 +21,7 @@ const CouponRoutes = require('./routes/couponRoute');
 const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
 const OurlocationRoutes = require('./routes/ourlocationRoute');
 const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
-const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute')
+const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute')
@@ -43,9 +44,19 @@ app.use(cors({
 
 }))
 
+app.use(express.static(path.join(__dirname, "public")));
+
 // Sample route
 app.get('/', (req, res) => {
   res.send('Welcome to Sudhveda Honey API');
+});
+
+app.get("/socket-test", (req, res) => {
+
+  res.sendFile(
+    path.join(__dirname, "public", "socket-test.html")
+  );
+
 });
 
 // User authentication routes

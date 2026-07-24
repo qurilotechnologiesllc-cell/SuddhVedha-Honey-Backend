@@ -1,4 +1,5 @@
 const BulkOrderEnquiry = require("../models/bulkOrderEnquiry.model");
+const { getIO, ADMIN_ROOM } = require('../utils/socketHandler')
 const {
     asyncHandler,
     BadRequestError,
@@ -47,6 +48,22 @@ const sendEnquiry = asyncHandler(async (req, res) => {
     // -------------------------
     // Save Enquiry
     // -------------------------
+
+    const io = getIO();
+
+    io.to(ADMIN_ROOM).emit("new-enquiry", {
+
+        title: "New Bulk Order",
+
+        fullname,
+
+        businessEmail,
+
+        expectedQuantity,
+
+        createdAt: new Date()
+
+    });
 
     const enquiry = await BulkOrderEnquiry.create({
 
