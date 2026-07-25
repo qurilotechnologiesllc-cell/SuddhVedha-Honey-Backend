@@ -1,6 +1,7 @@
 const Product = require('../models/product.model')
 const ProductImage = require("../models/productImage.model")
 const ProductVariant = require('../models/productVariant.model')
+const ProductVideo = require('../models/productVideo.model')
 const cloudinary = require('../config/cloudinary')
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
@@ -253,43 +254,43 @@ const getProductById = asyncHandler(async (req, res) => {
     }
 
     const videoData = productvideos?.map((video) => {
-    
-            const videoUrl = cloudinary.url(video.public_id, {
-                resource_type: "video",
-                secure: true
-            });
-    
-            const thumbnailUrl = cloudinary.url(video.public_id, {
-                resource_type: "video",
-                secure: true,
-                format: "jpg",
-                transformation: [
-                    {
-                        start_offset: "2"
-                    },
-                    {
-                        width: 500,
-                        crop: "fill"
-                    }
-                ]
-            });
-    
-            return {
-    
-                _id: video._id,
-    
-                duration: video.duration,
-    
-                format: video.format,
-    
-                video_url: videoUrl,
-    
-                thumbnail_url: thumbnailUrl
-    
-            };
-    
+
+        const videoUrl = cloudinary.url(video.public_id, {
+            resource_type: "video",
+            secure: true
         });
-    
+
+        const thumbnailUrl = cloudinary.url(video.public_id, {
+            resource_type: "video",
+            secure: true,
+            format: "jpg",
+            transformation: [
+                {
+                    start_offset: "2"
+                },
+                {
+                    width: 500,
+                    crop: "fill"
+                }
+            ]
+        });
+
+        return {
+
+            _id: video._id,
+
+            duration: video.duration,
+
+            format: video.format,
+
+            video_url: videoUrl,
+
+            thumbnail_url: thumbnailUrl
+
+        };
+
+    });
+
 
     // 3. Original objects ko flat single object se replace kar diya
     product.imageDocumentId = productImages;
@@ -813,6 +814,73 @@ const updateProductVariant = asyncHandler(async (req, res) => {
 
 });
 
+const removeProductByAdmin = asyncHandler(async (req, res) => {
+    const { role } = req.user
+    const { productId } = req.params
+
+    // ─── Admin Check ──────────────────────────────
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new UnauthorizedError(
+            'Only admin can remove products'
+        )
+    }
+
+    // ─── Product Exist Karta Hai? ─────────────────
+    const product = await Product.findById(productId)
+    if (!product) {
+        throw new NotFoundError('Product not found')
+    }
+
+    // ─── Step 1: Images Cloudinary se Delete ──────
+    const imageDocument = await ProductImage.findOne({
+        product: productId
+    })
+
+    if (imageDocument && imageDocument.images.length > 0) {
+        // Saari images delete karo
+        await Promise.all(
+            imageDocument.images.map(async (image) => {
+                await deleteFromCloudinary(
+                    image.public_id,
+                    'image'     // ← resource_type image
+                )
+            })
+        )
+        // Image document delete karo
+        await ProductImage.findOneAndDelete({ product: productId })
+    }
+
+    // ─── Step 2: Videos Cloudinary se Delete ──────
+    const videoDocument = await ProductVideo.findOne({
+        product: productId
+    })
+
+    if (videoDocument && videoDocument.videos.length > 0) {
+        // Saare videos delete karo
+        await Promise.all(
+            videoDocument.videos.map(async (video) => {
+                await deleteFromCloudinary(
+                    video.public_id,
+                    'video'     // ← resource_type video
+                )
+            })
+        )
+        // Video document delete karo
+        await ProductVideo.findOneAndDelete({ product: productId })
+    }
+
+    // ─── Step 3: Variants Delete ──────────────────
+    await ProductVariant.findOneAndDelete({ product: productId })
+
+    // ─── Step 4: Product Delete ───────────────────
+    await Product.findByIdAndDelete(productId)
+
+    res.status(200).json({
+        success: true,
+        message: 'Product removed successfully'
+    })
+})
+
 
 module.exports = {
     createProduct,
@@ -822,5 +890,6 @@ module.exports = {
     uploadProductImages,
     createProductVariant,
     updateProductImage,
-    updateProductVariant
+    updateProductVariant,
+    removeProductByAdmin
 }
