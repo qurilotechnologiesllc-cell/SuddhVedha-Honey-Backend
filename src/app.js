@@ -24,7 +24,7 @@ const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
 const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 
 // Now from there its start the admin routes 
-const adminAuthRoutes = require('./routes/adminAuthRoute')
+const adminAuthRoutes = require('./routes/adminAuthRoute');
 
 // Middleware to parse JSON requests
 app.use(express.json());

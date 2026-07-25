@@ -799,17 +799,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
 
     }
 
-
-    // ==========================================
-    // Save
-    // ==========================================
-
     await variantDocument.save();
-
-
-    // ==========================================
-    // Response
-    // ==========================================
 
     return res.status(200).json({
 
