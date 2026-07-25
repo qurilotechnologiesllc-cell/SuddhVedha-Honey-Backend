@@ -1,5 +1,6 @@
 const BulkOrderEnquiry = require("../models/bulkOrderEnquiry.model");
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler')
+const { sendThankYouEmail, sendupdateEnquiryEmail } = require('../utils/sendEmail')
 const {
     asyncHandler,
     BadRequestError,
@@ -64,6 +65,8 @@ const sendEnquiry = asyncHandler(async (req, res) => {
         createdAt: new Date()
 
     });
+
+    await sendThankYouEmail(businessEmail, fullname)
 
     const enquiry = await BulkOrderEnquiry.create({
 
@@ -155,6 +158,15 @@ const updateEnquiryStatusWithNotes = asyncHandler(async (req, res) => {
     if (status && !allowedStatus.includes(status)) {
         throw new BadRequestError("Invalid enquiry status.");
     }
+
+    const payload = {
+        userEmail: enquiry.business_email,
+        fullname: enquiry.full_name,
+        message: admin_notes,
+        status: status
+    }
+
+    const result = await sendupdateEnquiryEmail(payload)
 
     // -----------------------------
     // Update Fields

@@ -37,6 +37,8 @@ app.use(cors({
   origin: [
     "http://localhost:3000",
 
+    "http://localhost:3001",
+
     "https://frontend-3000.devtunnels.ms"
   ],
 

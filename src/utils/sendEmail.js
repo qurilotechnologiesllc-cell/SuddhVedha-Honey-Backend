@@ -129,4 +129,75 @@ const sendEmailforOtp = async (adminEmail, fullname, otp) => {
     }
 }
 
-module.exports = { sendThankYouEmail, sendEmailforOtp };
+const sendupdateEnquiryEmail = async (userinfo) => {
+
+    console.log(userinfo);
+    
+
+    const { userEmail, fullname, message, status } = userinfo
+    try {
+
+        const response =
+            await brevo.transactionalEmails.sendTransacEmail({
+
+                sender: {
+
+                    email: process.env.BREVO_SENDER_EMAIL,
+
+                    name: process.env.BREVO_SENDER_NAME
+
+                },
+
+                to: [
+
+                    {
+
+                        email: userEmail,
+
+                        name: fullname
+
+                    }
+
+                ],
+
+                templateId: Number(process.env.BREVO__ENQUIRY_TEMPLATE_ID),
+
+                params: {
+
+                    userName: fullname,
+
+                    message: message,
+
+                    status: status
+                }
+
+            });
+
+        console.log("✅ Email Sent", response);
+
+        return {
+
+            success: true,
+
+            data: response
+
+        };
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        return {
+
+            success: false,
+
+            error: error.message
+
+        };
+
+    }
+}
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail };
