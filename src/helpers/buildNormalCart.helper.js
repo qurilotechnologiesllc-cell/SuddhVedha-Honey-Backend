@@ -69,7 +69,7 @@ const buildNormalCart = (
 
                     mrp: variant.mrp,
 
-                    discount: variant.discount
+                    save: variant.you_save
 
                 }
 

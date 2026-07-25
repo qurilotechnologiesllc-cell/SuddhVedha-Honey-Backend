@@ -467,26 +467,7 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
     const { id } = req.params;
 
-    const {
-        mrp,
-        price,
-        discount_type,
-        tax,
-
-        sku,
-        barcode,
-
-        weight,
-        unit,
-
-        available_stock,
-        low_stock_alert,
-
-        stock_status,
-        allow_backorders
-
-    } = req.body;
-
+    const { variants } = req.body;
 
     // ==========================================
     // Validate Product
@@ -498,89 +479,9 @@ const createProductVariant = asyncHandler(async (req, res) => {
         throw new NotFoundError("Product not found.");
     }
 
-
-    // ==========================================
-    // Basic Pricing Validation
-    // ==========================================
-
-    if (Number(price) > Number(mrp)) {
-        throw new BadRequestError(
-            "Selling price cannot be greater than MRP."
-        );
+    if (!Array.isArray(variants) || variants.length === 0) {
+        throw new BadRequestError("At least one variant is required.");
     }
-
-
-    // ==========================================
-    // Calculate You Save
-    // ==========================================
-
-    const calculatedYouSave =
-        Number(mrp) - Number(price);
-
-
-    // ==========================================
-    // Calculate Discount Value
-    // ==========================================
-
-    let calculatedDiscountValue = 0;
-
-    if (discount_type === "percentage") {
-
-        calculatedDiscountValue =
-            (calculatedYouSave / Number(mrp)) * 100;
-
-        calculatedDiscountValue =
-            Number(calculatedDiscountValue.toFixed(2));
-
-    } else if (discount_type === "fixed") {
-
-        calculatedDiscountValue =
-            Number(calculatedYouSave.toFixed(2));
-
-    }
-
-
-    // ==========================================
-    // Prepare Variant
-    // ==========================================
-
-    const newVariant = {
-
-        // Pricing
-        mrp: Number(mrp),
-
-        price: Number(price),
-
-        discount_type,
-
-        discount_value: calculatedDiscountValue,
-
-        you_save: Number(calculatedYouSave.toFixed(2)),
-
-        tax,
-
-
-        // Inventory
-        sku,
-
-        barcode: barcode || null,
-
-        weight: Number(weight),
-
-        unit,
-
-        available_stock: Number(available_stock),
-
-        low_stock_alert: Number(low_stock_alert),
-
-        stock_status,
-
-        allow_backorders:
-            allow_backorders === true ||
-            allow_backorders === "true"
-
-    };
-
 
     // ==========================================
     // Find Existing Variant Document
@@ -590,9 +491,120 @@ const createProductVariant = asyncHandler(async (req, res) => {
         product: id
     });
 
+    const preparedVariants = [];
+
+    for (const variant of variants) {
+
+        const {
+            mrp,
+            price,
+            discount_type,
+            tax,
+            sku,
+            barcode,
+            weight,
+            unit,
+            available_stock,
+            low_stock_alert,
+            stock_status,
+            allow_backorders
+        } = variant;
+
+        // -----------------------------
+        // Price Validation
+        // -----------------------------
+
+        if (Number(price) > Number(mrp)) {
+            throw new BadRequestError(
+                `${weight}${unit}: Selling price cannot be greater than MRP.`
+            );
+        }
+
+        const youSave = Number(mrp) - Number(price);
+
+        let discountValue = 0;
+
+        if (discount_type === "percentage") {
+
+            discountValue = Number(
+                ((youSave / Number(mrp)) * 100).toFixed(2)
+            );
+
+        } else {
+
+            discountValue = Number(
+                youSave.toFixed(2)
+            );
+
+        }
+
+        // -----------------------------
+        // Duplicate Validation
+        // -----------------------------
+
+        if (variantDoc) {
+
+            const weightExists = variantDoc.variants.find(item =>
+                Number(item.weight) === Number(weight) &&
+                item.unit === unit
+            );
+
+            if (weightExists) {
+                throw new BadRequestError(
+                    `Variant ${weight}${unit} already exists.`
+                );
+            }
+
+            const skuExists = variantDoc.variants.find(item =>
+                item.sku.toLowerCase() === sku.toLowerCase()
+            );
+
+            if (skuExists) {
+                throw new BadRequestError(
+                    `SKU ${sku} already exists.`
+                );
+            }
+
+        }
+
+        preparedVariants.push({
+
+            mrp: Number(mrp),
+
+            price: Number(price),
+
+            discount_type,
+
+            discount_percentage: discountValue,
+
+            you_save: Number(youSave.toFixed(2)),
+
+            tax,
+
+            sku,
+
+            barcode: barcode || null,
+
+            weight: Number(weight),
+
+            unit,
+
+            available_stock: Number(available_stock),
+
+            low_stock_alert: Number(low_stock_alert),
+
+            stock_status,
+
+            allow_backorders:
+                allow_backorders === true ||
+                allow_backorders === "true"
+
+        });
+
+    }
 
     // ==========================================
-    // First Variant Of Product
+    // Save
     // ==========================================
 
     if (!variantDoc) {
@@ -601,96 +613,27 @@ const createProductVariant = asyncHandler(async (req, res) => {
 
             product: id,
 
-            variants: [
-                newVariant
-            ]
+            variants: preparedVariants
 
         });
-
-
-        // Save ProductVariant document reference
-        // inside Product document
 
         product.variantDocumentId = variantDoc._id;
 
         await product.save();
 
-    }
+    } else {
 
-
-    // ==========================================
-    // Product Already Has Variants
-    // ==========================================
-
-    else {
-
-        // --------------------------------------
-        // Check Weight + Unit
-        // --------------------------------------
-
-        const alreadyExists = variantDoc.variants.find(
-
-            item =>
-                Number(item.weight) === Number(weight) &&
-                item.unit === unit
-
-        );
-
-
-        if (alreadyExists) {
-
-            throw new BadRequestError(
-                `Variant ${weight}${unit} already exists.`
-            );
-
-        }
-
-
-        // --------------------------------------
-        // Check Duplicate SKU
-        // --------------------------------------
-
-        const skuExists = variantDoc.variants.find(
-
-            item =>
-                item.sku.toLowerCase() ===
-                sku.toLowerCase()
-
-        );
-
-
-        if (skuExists) {
-
-            throw new BadRequestError(
-                "Variant with this SKU already exists."
-            );
-
-        }
-
-
-        // --------------------------------------
-        // Add New Variant
-        // --------------------------------------
-
-        variantDoc.variants.push(
-            newVariant
-        );
-
+        variantDoc.variants.push(...preparedVariants);
 
         await variantDoc.save();
 
     }
 
-
-    // ==========================================
-    // Response
-    // ==========================================
-
     return res.status(201).json({
 
         success: true,
 
-        message: "Product variant created successfully.",
+        message: "Product variants created successfully.",
 
         data: variantDoc
 
@@ -828,7 +771,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
                 ? (youSave / variant.mrp) * 100
                 : 0;
 
-        variant.discount_value =
+        variant.discount_percentage =
             Number(discountPercentage.toFixed(2));
 
     }
@@ -836,7 +779,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
     // Fixed discount
     else if (variant.discount_type === "fixed") {
 
-        variant.discount_value =
+        variant.discount_percentage =
             Number(youSave.toFixed(2));
 
     }

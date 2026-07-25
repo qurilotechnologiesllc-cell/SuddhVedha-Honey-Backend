@@ -70,6 +70,7 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
     let totalWeight = 0;
     let calculatedTotalAmount = 0;
+    let save = 0;
 
     // -----------------------------
     // Basic Validation
@@ -133,6 +134,8 @@ const addToGiftCart = asyncHandler(async (req, res) => {
         // variant Price
         calculatedTotalAmount += variant.price;
 
+        save += variant.you_save
+
     }
 
 
@@ -190,7 +193,9 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
             totalWeight,
 
-            totalAmount: calculatedTotalAmount
+            totalAmount: calculatedTotalAmount,
+
+            save
 
         }
 

@@ -30,7 +30,9 @@ const buildGiftCart = (
 
             packingPrice,
 
-            totalAmount
+            totalAmount,
+
+            totalsave
 
         } = calculateGiftTotals(
 
@@ -72,7 +74,9 @@ const buildGiftCart = (
 
             packingPrice,
 
-            totalAmount
+            totalAmount,
+
+            totalsave
 
         };
 

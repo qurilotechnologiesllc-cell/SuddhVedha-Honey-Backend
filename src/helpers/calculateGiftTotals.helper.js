@@ -6,6 +6,7 @@ const calculateGiftTotals = (
 
     let totalWeight = 0;
     let totalAmount = 0;
+    let totalsave = 0;
 
     const giftBox = giftBoxMap.get(
         giftItem.giftBoxId.toString()
@@ -37,6 +38,8 @@ const calculateGiftTotals = (
 
         totalWeight += parseInt(variant.weight);
 
+        totalsave += variant.you_save
+
         return {
 
             productId: catalog.product._id,
@@ -66,7 +69,7 @@ const calculateGiftTotals = (
 
                 mrp: variant.mrp,
 
-                discount: variant.discount
+                save: variant.you_save
 
             }
 
@@ -82,7 +85,9 @@ const calculateGiftTotals = (
 
         packingPrice: giftBox?.price || 0,
 
-        totalAmount
+        totalAmount, 
+
+        totalsave
 
     };
 

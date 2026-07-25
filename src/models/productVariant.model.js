@@ -24,7 +24,7 @@ const VariantItemSchema = new mongoose.Schema({
         default: "percentage"
     },
 
-    discount_value: {
+    discount_percentage: {
         type: Number,
         default: 0,
         min: 0
