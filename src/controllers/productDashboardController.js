@@ -271,5 +271,78 @@ const getProductStockList = asyncHandler(async (req, res) => {
     })
 })
 
+const getproductStockHistory = asyncHandler(async (req, res) => {
 
-module.exports = { getTotalProductCount, getProductsByType, getLowStockProductlist, getProductStockList }
+    const { role } = req.user;
+    const { productId } = req.params;
+
+    // ==========================================
+    // Authorize Admin
+    // ==========================================
+
+    if (!["admin", "superadmin"].includes(role)) {
+        throw new ForbiddenError(
+            "You are not authorized to access stock history."
+        );
+    }
+
+    // ==========================================
+    // Find Product Variant Document
+    // ==========================================
+
+    const variantDocument = await ProductVariant.findOne({
+        product: productId
+    });
+
+    if (!variantDocument) {
+        throw new NotFoundError(
+            "Product variant document not found."
+        );
+    }
+
+    // ==========================================
+    // Prepare Response
+    // ==========================================
+
+    const stockHistory = variantDocument.stock_history.map(history => {
+
+        const variant = variantDocument.variants.id(history.variantId);
+
+        return {
+
+            variantId: history.variantId,
+
+            weight: variant
+                ? `${variant.weight}${variant.unit}`
+                : `${history.weight || ""}`,
+
+            previous_stock: history.previous_stock,
+
+            updated_stock: history.updated_stock,
+
+            updated_at: history.updated_at
+
+        };
+
+    });
+
+    // ==========================================
+    // Response
+    // ==========================================
+
+    return res.status(200).json({
+
+        success: true,
+
+        message: "Stock history fetched successfully.",
+
+        totalHistory: stockHistory.length,
+
+        data: stockHistory
+
+    });
+
+});
+
+
+module.exports = { getTotalProductCount, getProductsByType, getLowStockProductlist, getProductStockList, getproductStockHistory }

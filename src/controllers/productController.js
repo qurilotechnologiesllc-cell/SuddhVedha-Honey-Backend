@@ -649,8 +649,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
     const {
         price,
         mrp,
-        available_stock,
-        low_stock_alert
+        updated_stock
     } = req.body;
 
 
@@ -661,11 +660,16 @@ const updateProductVariant = asyncHandler(async (req, res) => {
     if (
         price === undefined &&
         mrp === undefined &&
-        available_stock === undefined &&
-        low_stock_alert === undefined
+        updated_stock === undefined
     ) {
         throw new BadRequestError(
             "At least one field is required: price, mrp, available_stock or low_stock_alert."
+        );
+    }
+
+    if (updated_stock < 0) {
+        throw new BadRequestError(
+            "Updated stock cannot be negative."
         );
     }
 
@@ -697,6 +701,7 @@ const updateProductVariant = asyncHandler(async (req, res) => {
         );
     }
 
+    const previousStock = variant.available_stock;
 
     // ==========================================
     // Update Only Allowed Fields
@@ -708,14 +713,6 @@ const updateProductVariant = asyncHandler(async (req, res) => {
 
     if (mrp !== undefined) {
         variant.mrp = Number(mrp);
-    }
-
-    if (available_stock !== undefined) {
-        variant.available_stock = Number(available_stock);
-    }
-
-    if (low_stock_alert !== undefined) {
-        variant.low_stock_alert = Number(low_stock_alert);
     }
 
 
@@ -732,23 +729,6 @@ const updateProductVariant = asyncHandler(async (req, res) => {
     if (variant.price > variant.mrp) {
         throw new BadRequestError(
             "Selling price cannot be greater than MRP."
-        );
-    }
-
-
-    // ==========================================
-    // Inventory Validation
-    // ==========================================
-
-    if (variant.available_stock < 0) {
-        throw new BadRequestError(
-            "Available stock cannot be negative."
-        );
-    }
-
-    if (variant.low_stock_alert < 0) {
-        throw new BadRequestError(
-            "Low stock alert cannot be negative."
         );
     }
 
@@ -785,18 +765,52 @@ const updateProductVariant = asyncHandler(async (req, res) => {
 
     }
 
+    if (updated_stock !== undefined) {
 
-    // ==========================================
-    // Automatically Update Stock Status
-    // ==========================================
+        const updatedStock = Number(updated_stock);
 
-    if (variant.available_stock > 0) {
+        variant.available_stock += updatedStock;
 
-        variant.stock_status = "in_stock";
+        variantDocument.stock_history.push({
 
-    } else {
+            variantId: variant._id,
 
-        variant.stock_status = "out_of_stock";
+            weight: variant.weight,
+
+            previous_stock: previousStock,
+
+            updated_stock: updatedStock,
+
+            stock_difference: updatedStock - previousStock,
+
+            updated_at: new Date()
+
+        });
+
+    }
+
+
+
+    switch (true) {
+
+        case variant.available_stock <= 0:
+
+            variant.stock_status = "out_of_stock";
+            break;
+
+        case variant.available_stock <= variant.low_stock_alert:
+
+            variant.stock_status = "low_stock";
+            break;
+
+        case variant.available_stock > variant.low_stock_alert:
+
+            variant.stock_status = "in_stock";
+            break;
+
+        default:
+
+            variant.stock_status = "out_of_stock";
 
     }
 

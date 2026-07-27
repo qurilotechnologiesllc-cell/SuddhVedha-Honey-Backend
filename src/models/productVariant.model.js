@@ -100,6 +100,37 @@ const VariantItemSchema = new mongoose.Schema({
 
 });
 
+const StockHistorySchema = new mongoose.Schema({
+
+    variantId: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true
+    },
+
+    previous_stock: {
+        type: Number,
+        required: true
+    },
+
+    updated_stock: {
+        type: Number,
+        required: true
+    },
+
+    weight: {
+        type: Number,
+        required: true
+    },
+
+    updated_at: {
+        type: Date,
+        default: Date.now
+    }
+
+}, {
+    _id: false
+});
+
 
 const ProductVariantSchema = new mongoose.Schema({
 
@@ -112,6 +143,10 @@ const ProductVariantSchema = new mongoose.Schema({
 
     variants: [
         VariantItemSchema
+    ],
+
+    stock_history: [
+        StockHistorySchema
     ]
 
 }, {
