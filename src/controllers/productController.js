@@ -110,7 +110,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
             path: 'variantDocumentId',
             select: 'variants -_id'
         })
-        .select('-createdAt -updatedAt -__v')
+        .select('-createdAt -__v')
         .lean(); // <-- Super Important!
 
     // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li

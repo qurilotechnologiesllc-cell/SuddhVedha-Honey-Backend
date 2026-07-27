@@ -17,7 +17,7 @@ const ProductSchema = new mongoose.Schema(
         product_type: {
             type: String,
             required: true,
-            enum: ["honey", "gift-box"]
+            enum: ["honey", "gift_box"]
         },
 
         floral_source: {

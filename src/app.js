@@ -25,6 +25,7 @@ const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
+const productDashboardRoutes = require('./routes/productDashboardRoute');
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -83,6 +84,7 @@ app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
 
 // Admin Routes
 app.use('/api/admin', adminAuthRoutes);
+app.use('/api/dashboard', productDashboardRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
