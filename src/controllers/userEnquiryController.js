@@ -1,5 +1,6 @@
 const Enquiry = require('../models/userEnquiry.model')
 const { sendThankYouEmail } = require('../utils/sendEmail')
+const { getIO, ADMIN_ROOM } = require('../utils/socketHandler')
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ConflictError, ServiceUnavailableError } = require('../errors/errorConfig')
 
 const submituserEnquiry = asyncHandler(async (req, res) => {
@@ -51,6 +52,22 @@ const submituserEnquiry = asyncHandler(async (req, res) => {
         )
     }
 
+    const io = getIO();
+
+    io.to(ADMIN_ROOM).emit("new-enquiry", {
+
+        title: "New User Enquiry",
+
+        fullname: name,
+
+        businessEmail: email,
+
+        message,
+
+        createdAt: new Date()
+
+    });
+
     // ─── DB mein Save karo ───────────────────────
     // Email successfully gayi toh hi save karo!
     const enquiry = await Enquiry.create({
@@ -69,5 +86,93 @@ const submituserEnquiry = asyncHandler(async (req, res) => {
     })
 })
 
+const getUserAllEnquiry = asyncHandler(async (req, res) => {
+    const { role } = req.user
 
-module.exports = { submituserEnquiry }
+    // ─── Admin Check ──────────────────────────────
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new ForbiddenError(
+            'Access denied. Only admin can access enquiries'
+        )
+    }
+
+    // ─── Saari Enquiries Fetch karo ───────────────
+    const enquiries = await Enquiry.find()
+        .select('-__v')
+        .sort({ createdAt: -1 }) // ← Latest pehle
+
+    if (!enquiries.length) {
+        return res.status(200).json({
+            success: true,
+            message: 'No enquiries found',
+            total: 0,
+            data: []
+        })
+    }
+
+    // ─── Read + Unread Count ──────────────────────
+    const unreadCount = enquiries.filter(e => !e.is_read).length
+    const readCount = enquiries.filter(e => e.is_read).length
+
+    res.status(200).json({
+        success: true,
+        message: 'Enquiries fetched successfully',
+        total: enquiries.length,
+        unreadCount,
+        readCount,
+        data: enquiries
+    })
+})
+
+const seenUserEnquiry = asyncHandler(async (req, res) => {
+
+    const { role } = req.user;
+    const { enquiryId } = req.params;
+
+    // ==========================================
+    // Authorize Admin
+    // ==========================================
+
+    if (!["admin", "superadmin"].includes(role)) {
+        throw new ForbiddenError(
+            "You are not authorized to access this enquiry."
+        );
+    }
+
+    // ==========================================
+    // Find Enquiry
+    // ==========================================
+
+    const enquiry = await Enquiry.findById(enquiryId);
+
+    if (!enquiry) {
+        throw new NotFoundError(
+            "Enquiry not found."
+        );
+    }
+
+    // ==========================================
+    // Mark as Read
+    // ==========================================
+
+    enquiry.is_read = true;
+
+    await enquiry.save();
+
+    // ==========================================
+    // Response
+    // ==========================================
+
+    return res.status(200).json({
+
+        success: true,
+
+        message: "Enquiry marked as read successfully.",
+
+        data: enquiry
+
+    });
+
+});
+
+module.exports = { submituserEnquiry, getUserAllEnquiry, seenUserEnquiry }

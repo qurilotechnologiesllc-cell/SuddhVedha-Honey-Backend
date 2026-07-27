@@ -84,6 +84,8 @@ socket.on("new-enquiry",(data)=>{
 
         <p><b>Quantity :</b> ${data.expectedQuantity}</p>
 
+        <p><b>message :</b> ${data.message}</p>
+
         <p>${new Date(data.createdAt).toLocaleString()}</p>
 
     `;
