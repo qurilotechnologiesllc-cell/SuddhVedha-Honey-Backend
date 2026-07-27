@@ -669,6 +669,10 @@ const updateProductVariant = asyncHandler(async (req, res) => {
         );
     }
 
+    if (available_stock <= low_stock_alert) {
+        throw new BadRequestError('Avaliable Stock is greater then low stock')
+    }
+
 
     // ==========================================
     // Find Product Variant Document
