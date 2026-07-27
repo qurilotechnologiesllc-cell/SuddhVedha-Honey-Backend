@@ -649,6 +649,178 @@ const updateProductVariant = asyncHandler(async (req, res) => {
     const {
         price,
         mrp,
+        available_stock,
+        low_stock_alert
+    } = req.body;
+
+
+    // ==========================================
+    // At Least One Field Required
+    // ==========================================
+
+    if (
+        price === undefined &&
+        mrp === undefined &&
+        available_stock === undefined &&
+        low_stock_alert === undefined
+    ) {
+        throw new BadRequestError(
+            "At least one field is required: price, mrp, available_stock or low_stock_alert."
+        );
+    }
+
+
+    // ==========================================
+    // Find Product Variant Document
+    // ==========================================
+
+    const variantDocument = await ProductVariant.findOne({
+        product: productId
+    });
+
+    if (!variantDocument) {
+        throw new NotFoundError(
+            "Product variant document not found."
+        );
+    }
+
+
+    // ==========================================
+    // Find Particular Variant
+    // ==========================================
+
+    const variant = variantDocument.variants.id(variantId);
+
+    if (!variant) {
+        throw new NotFoundError(
+            "Variant not found with this ID."
+        );
+    }
+
+
+    // ==========================================
+    // Update Only Allowed Fields
+    // ==========================================
+
+    if (price !== undefined) {
+        variant.price = Number(price);
+    }
+
+    if (mrp !== undefined) {
+        variant.mrp = Number(mrp);
+    }
+
+    if (available_stock !== undefined) {
+        variant.available_stock = Number(available_stock);
+    }
+
+    if (low_stock_alert !== undefined) {
+        variant.low_stock_alert = Number(low_stock_alert);
+    }
+
+
+    // ==========================================
+    // Price Validation
+    // ==========================================
+
+    if (variant.price < 0 || variant.mrp < 0) {
+        throw new BadRequestError(
+            "Price and MRP cannot be negative."
+        );
+    }
+
+    if (variant.price > variant.mrp) {
+        throw new BadRequestError(
+            "Selling price cannot be greater than MRP."
+        );
+    }
+
+
+    // ==========================================
+    // Inventory Validation
+    // ==========================================
+
+    if (variant.available_stock < 0) {
+        throw new BadRequestError(
+            "Available stock cannot be negative."
+        );
+    }
+
+    if (variant.low_stock_alert < 0) {
+        throw new BadRequestError(
+            "Low stock alert cannot be negative."
+        );
+    }
+
+
+    // ==========================================
+    // Recalculate Discount
+    // ==========================================
+
+    const youSave =
+        Number(variant.mrp) - Number(variant.price);
+
+    variant.you_save =
+        Number(youSave.toFixed(2));
+
+
+    // Percentage discount
+    if (variant.discount_type === "percentage") {
+
+        const discountPercentage =
+            variant.mrp > 0
+                ? (youSave / variant.mrp) * 100
+                : 0;
+
+        variant.discount_percentage =
+            Number(discountPercentage.toFixed(2));
+
+    }
+
+    // Fixed discount
+    else if (variant.discount_type === "fixed") {
+
+        variant.discount_percentage =
+            Number(youSave.toFixed(2));
+
+    }
+
+
+    // ==========================================
+    // Automatically Update Stock Status
+    // ==========================================
+
+    if (variant.available_stock > 0) {
+
+        variant.stock_status = "in_stock";
+
+    } else {
+
+        variant.stock_status = "out_of_stock";
+
+    }
+
+    await variantDocument.save();
+
+    return res.status(200).json({
+
+        success: true,
+
+        message: "Product variant updated successfully.",
+
+        data: variant
+
+    });
+
+});
+
+const updateProductStock = asyncHandler(async (req, res) => {
+
+    const { productId, variantId } = req.params;
+
+    const {
+        price,
+        mrp,
         updated_stock
     } = req.body;
 
@@ -905,5 +1077,6 @@ module.exports = {
     createProductVariant,
     updateProductImage,
     updateProductVariant,
+    updateProductStock,
     removeProductByAdmin
 }
