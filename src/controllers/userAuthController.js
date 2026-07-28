@@ -305,6 +305,33 @@ const getUserProfile = asyncHandler(async (req, res) => {
     })
 })
 
+const logoutUser = asyncHandler(async (req, res) => {
+    const { role, id } = req.user
 
+    // ─── Role Validate karo ───────────────────
+    if (role !== 'user') {
+        throw new ForbiddenError(
+            'Access denied. Only users can access this route'
+        )
+    }
 
-module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile, getUserProfile };
+    // ─── User Exist Karta Hai? ────────────────
+    const user = await User.findById(id)
+    if (!user) {
+        throw new NotFoundError('User not found')
+    }
+
+    res.clearCookie('token', {
+        httpOnly: true,
+        signed: true,
+        secure: true,
+        sameSite: 'none'
+    })
+
+    res.status(200).json({
+        success: true,
+        message: 'Logged out successfully'
+    })
+})
+
+module.exports = { createUser, verifyOtp, loginUser, verifyLoginOtp, updateUserProfile, getUserProfile, logoutUser };
