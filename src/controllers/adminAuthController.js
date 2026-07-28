@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const Admin = require('../models/admin.model');
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ConflictError, ServiceUnavailableError } = require('../errors/errorConfig');
+const cloudinary = require('../config/cloudinary')
 const redis = require('../utils/redis')
 const { sendEmailforOtp } = require('../utils/sendEmail')
 const { generateToken } = require('../middlewares/authmiddleware')
