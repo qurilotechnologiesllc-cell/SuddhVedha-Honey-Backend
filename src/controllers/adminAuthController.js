@@ -239,6 +239,55 @@ const updateAdminprofile = asyncHandler(async (req, res) => {
 
 });
 
+const GetAdminProfile = asyncHandler(async (req, res) => {
+    const { role, id } = req.user
 
-module.exports = { SignInAdmin, verifyAdminOtp, updateAdminprofile }
+    // ─── Role Check ───────────────────────────
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new ForbiddenError(
+            'Access denied. Only admin can access this resource'
+        )
+    }
+
+    // ─── ID se Admin Dhundo ───────────────────
+    const admin = await Admin.findById(id)
+        .select('-password -__v') // ← Password hide karo
+
+    if (!admin) {
+        throw new NotFoundError('Admin not found')
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Admin profile fetched successfully',
+        data: admin
+    })
+})
+
+const logoutAdmin = asyncHandler(async (req, res) => {
+    const { role } = req.user
+
+    // ─── Role Check ───────────────────────────
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new ForbiddenError(
+            'Access denied. Only admin can logout from this route'
+        )
+    }
+
+    // ─── Cookie Delete karo ───────────────────
+    res.clearCookie('token', {
+        httpOnly: true,
+        signed: true,
+        secure: true,
+        sameSite: 'none'
+    })
+
+    res.status(200).json({
+        success: true,
+        message: 'Admin logged out successfully'
+    })
+})
+
+
+module.exports = { SignInAdmin, verifyAdminOtp, updateAdminprofile, GetAdminProfile, logoutAdmin }
 
