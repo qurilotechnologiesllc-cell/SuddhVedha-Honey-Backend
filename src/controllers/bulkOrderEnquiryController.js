@@ -1,4 +1,5 @@
 const BulkOrderEnquiry = require("../models/bulkOrderEnquiry.model");
+const Notification = require('../models/notification.model');
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler')
 const { sendThankYouEmail, sendupdateEnquiryEmail } = require('../utils/sendEmail')
 const {
@@ -46,27 +47,25 @@ const sendEnquiry = asyncHandler(async (req, res) => {
 
     }
 
-    // -------------------------
-    // Save Enquiry
-    // -------------------------
+    await sendThankYouEmail(businessEmail, fullname)
 
     const io = getIO();
 
-    io.to(ADMIN_ROOM).emit("new-enquiry", {
+    io.to(ADMIN_ROOM).emit("new-notification", {
 
-        title: "New Bulk Order",
+        title: "New Bulk Order Enquiry",
 
-        fullname,
-
-        businessEmail,
-
-        expectedQuantity,
+        message: `this user enquiry for bulk order ${expectedQuantity} please contact this email ${businessEmail}`,
 
         createdAt: new Date()
 
     });
 
-    await sendThankYouEmail(businessEmail, fullname)
+    const notification = await Notification.create({
+        title: "New Bulk Order Enquiry",
+        message: `this user enquiry for bulk order ${expectedQuantity} please contact this email ${businessEmail}`,
+        notification_time: new Date()
+    })
 
     const enquiry = await BulkOrderEnquiry.create({
 

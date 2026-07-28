@@ -1,4 +1,5 @@
 const Enquiry = require('../models/userEnquiry.model')
+const Notification = require('../models/notification.model')
 const { sendThankYouEmail } = require('../utils/sendEmail')
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler')
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ConflictError, ServiceUnavailableError } = require('../errors/errorConfig')
@@ -54,19 +55,21 @@ const submituserEnquiry = asyncHandler(async (req, res) => {
 
     const io = getIO();
 
-    io.to(ADMIN_ROOM).emit("new-enquiry", {
+    io.to(ADMIN_ROOM).emit("new-notification", {
 
         title: "New User Enquiry",
-
-        fullname: name,
-
-        businessEmail: email,
 
         message,
 
         createdAt: new Date()
 
     });
+
+    const notification = await Notification.create({
+        title: "User new Enquiry",
+        message: message,
+        notification_time: new Date()
+    })
 
     // ─── DB mein Save karo ───────────────────────
     // Email successfully gayi toh hi save karo!
