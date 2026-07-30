@@ -37,7 +37,7 @@ const addProductToWishlist = asyncHandler(async (req, res) => {
     wishlist.products.push({ productId, addedAt: new Date() })
     await wishlist.save()
 
-    res.status(200).json({ message: 'Product added to wishlist successfully', data: wishlist }) 
+    res.status(200).json({ message: 'Product added to wishlist successfully', data: wishlist })
 
 })
 
@@ -107,8 +107,36 @@ const getWishlist = asyncHandler(async (req, res) => {
     })
 })
 
+const wishlistCount = asyncHandler(async (req, res) => {
+    const { id } = req.user
+
+    // ─── Wishlist Dhundo ──────────────────────────
+    const wishlist = await Wishlist.findOne({ userId: id })
+        .select('products')
+
+    // ─── Wishlist Nahi Hai ────────────────────────
+    if (!wishlist) {
+        return res.status(200).json({
+            success: true,
+            message: 'Wishlist is empty',
+            count: 0
+        })
+    }
+
+    // ─── Products Count karo ──────────────────────
+    const count = wishlist.products.length
+
+    res.status(200).json({
+        success: true,
+        message: 'Wishlist count fetched successfully',
+        count
+    })
+})
+
+
 module.exports = {
     addProductToWishlist,
     removeProductFromWishlist,
-    getWishlist
+    getWishlist,
+    wishlistCount
 }
