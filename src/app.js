@@ -41,7 +41,9 @@ app.use(cors({
 
     "http://localhost:3001",
 
-    "https://frontend-3000.devtunnels.ms"
+    "https://frontend-3000.devtunnels.ms",
+     
+    "https://suddhveda-z57g.vercel.app"
   ],
 
   credentials: true
