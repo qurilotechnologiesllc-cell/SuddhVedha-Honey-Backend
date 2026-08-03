@@ -384,6 +384,6 @@ const filterProductByProductName = asyncHandler(async (req, res) => {
         totalProducts: products.length,
         data: products
     })
-})
+});
 
 module.exports = { filterProductByCategory, filterProductByQuantityPrice, filterProductByRating, filterProductByQuantity, filterProductByProductName }

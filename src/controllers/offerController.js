@@ -6,16 +6,14 @@ const addOffer = asyncHandler(async (req, res) => {
     const {
         title,
         couponCode,
-        minimumOrderAmount,
         discountType,
-        discountValue,
-        maximumDiscount,
+        discountValue
     } = req.body
 
     // ─── Required Fields ─────────────────────────
-    if (!title || !couponCode || !minimumOrderAmount || !discountType) {
+    if (!title || !couponCode || !discountType) {
         throw new BadRequestError(
-            'Title, minimumOrderAmount and discountType are required'
+            'Title, couponCode and discountType are required'
         )
     }
 
@@ -24,13 +22,6 @@ const addOffer = asyncHandler(async (req, res) => {
     if (!allowedTypes.includes(discountType)) {
         throw new BadRequestError(
             'discountType must be FREE_SHIPPING, PERCENTAGE or FLAT'
-        )
-    }
-
-    // ─── minimumOrderAmount Validate ──────────────
-    if (Number(minimumOrderAmount) < 0) {
-        throw new BadRequestError(
-            'Minimum order amount cannot be negative'
         )
     }
 
@@ -74,16 +65,11 @@ const addOffer = asyncHandler(async (req, res) => {
     const offer = await Offers.create({
         title,
         couponCode: couponCode.toUpperCase(),
-        minimumOrderAmount: Number(minimumOrderAmount),
         discountType,
         discountValue:
             discountType === "FREE_SHIPPING"
                 ? 0
                 : Number(discountValue),
-        maximumDiscount:
-            discountType === "PERCENTAGE"
-                ? Number(maximumDiscount) || null
-                : null
     });
 
     res.status(201).json({
@@ -97,8 +83,6 @@ const getAllOffers = asyncHandler(async (req, res) => {
 
     const offers = await Offers.find({ isActive: true })
         .select('-__v')
-        .sort({ minimumOrderAmount: 1 })
-    // ↑ Sabse kam amount wala offer pehle
 
     if (!offers.length) {
         return res.status(200).json({

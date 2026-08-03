@@ -16,12 +16,6 @@ const offerSchema = new mongoose.Schema(
             trim: true,
         },
 
-        minimumOrderAmount: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
-
         discountType: {
             type: String,
             enum: ["FREE_SHIPPING", "PERCENTAGE", "FLAT"],
@@ -32,12 +26,6 @@ const offerSchema = new mongoose.Schema(
             type: Number,
             required: true,
             min: 0,
-        },
-
-        // Only for percentage discount
-        maximumDiscount: {
-            type: Number,
-            default: null,
         },
 
 

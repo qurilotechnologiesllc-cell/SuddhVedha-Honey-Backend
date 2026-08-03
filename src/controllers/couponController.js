@@ -28,13 +28,6 @@ const applyCoupon = asyncHandler(async (req, res) => {
         )
     }
 
-
-    if (cartAmount < offer.minimumOrderAmount) {
-        throw new BadRequestError(
-            `Minimum order amount should be ₹${offer.minimumOrderAmount}`
-        );
-    }
-
     let discount = 0;
     let shipping = shippingCharge;
 
@@ -47,14 +40,6 @@ const applyCoupon = asyncHandler(async (req, res) => {
         case "PERCENTAGE":
             discount =
                 (cartAmount * offer.discountValue) / 100;
-
-            if (
-                offer.maximumDiscount &&
-                discount > offer.maximumDiscount
-            ) {
-                discount = offer.maximumDiscount;
-            }
-
             break;
 
         case "FREE_SHIPPING":
