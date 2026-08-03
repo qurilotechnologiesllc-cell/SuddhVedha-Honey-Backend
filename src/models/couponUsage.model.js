@@ -5,27 +5,36 @@ const couponUsageSchema = new mongoose.Schema(
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true,
+            required: true
         },
 
         offerId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Offer",
-            required: true,
+            required: true
         },
 
         couponCode: {
             type: String,
             required: true,
             uppercase: true,
-            trim: true,
+            trim: true
         },
+
+        isAvailable: {
+            type: Boolean,
+            default: true
+        },
+
+        isApplied: {
+            type: Boolean,
+            default: false
+        }
 
     },
     {
-        timestamps: true,
-    }
-);
+        timestamps: true
+    })
 
 // One user can use one coupon only once
 couponUsageSchema.index(

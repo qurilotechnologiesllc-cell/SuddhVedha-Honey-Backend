@@ -55,6 +55,7 @@ const applyCoupon = asyncHandler(async (req, res) => {
     await CouponUsage.create({
         userId,
         offerId: offer._id,
+        isApplied: true,
         couponCode: couponCode.toUpperCase().trim(),
     })
 
@@ -83,73 +84,95 @@ const applyCoupon = asyncHandler(async (req, res) => {
 });
 
 const getAvailableCoupon = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
 
-    const userId = req.user.id
+    // User ke coupon records
+    const couponUsages = await CouponUsage.find({ userId })
+        .select("offerId isAvailable isApplied");
 
-    // ─── Step 1: User ke used coupons dhundo ─────
-    // offerId list milegi
-    const usedCoupons = await CouponUsage.find({ userId })
-        .select('offerId couponCode')
+    // Applied coupons
+    const appliedOfferIds = new Set();
 
-    // Used offerIds ka Set banao — fast lookup ke liye
-    const usedOfferIds = new Set(
-        usedCoupons.map(c => c.offerId.toString())
-    )
+    // Permanently used coupons
+    const hiddenOfferIds = new Set();
 
-    // ─── Step 2: Saare active offers fetch karo ──
+    couponUsages.forEach((coupon) => {
+        const offerId = coupon.offerId.toString();
+
+        // Cart me applied hai
+        if (coupon.isAvailable && coupon.isApplied) {
+            appliedOfferIds.add(offerId);
+        }
+
+        // Order complete ho gaya
+        if (!coupon.isAvailable && coupon.isApplied) {
+            hiddenOfferIds.add(offerId);
+        }
+    });
+
+    console.log(hiddenOfferIds);
+    
+
+    // Active offers
     const offers = await Offers.find({ isActive: true })
-        .select('-createdAt -updatedAt -__v')
+        .select("-createdAt -updatedAt -isActive -__v");
 
     if (!offers.length) {
         return res.status(200).json({
             success: true,
-            message: 'No offers available',
+            message: "No offers available",
             total: 0,
-            data: []
-        })
+            data: [],
+        });
     }
 
-    // ─── Step 3: isAvailable flag add karo ───────
-    // offerId match → isAvailable: false
-    // offerId match nahi → isAvailable: true
-    const offersWithAvailability = offers.map(offer => ({
-        ...offer.toObject(),
-        isAvailable: !usedOfferIds.has(offer._id.toString())
-        //                          ↑
-        // used mein hai → false (already used)
-        // used mein nahi → true (use kar sakte ho)
-    }))
+    // Used coupons hata do
+    const filteredOffers = offers
+        .filter(
+            (offer) => !hiddenOfferIds.has(offer._id.toString())
+        )
+        .map((offer) => ({
+            ...offer.toObject(),
 
-    res.status(200).json({
+            // Frontend ke liye
+            isApplied: appliedOfferIds.has(
+                offer._id.toString()
+            ),
+        }));
+
+    return res.status(200).json({
         success: true,
-        message: 'Offers fetched successfully',
-        total: offersWithAvailability.length,
-        data: offersWithAvailability
-    })
-})
+        message: "Offers fetched successfully",
+        total: filteredOffers.length,
+        data: filteredOffers,
+    });
+});
 
 const removeCouponByUser = asyncHandler(async (req, res) => {
-    const userId = req.user.id
-    const { offerId } = req.params
+    const userId = req.user.id;
+    const { offerId } = req.params;
 
-    // ─── Document Dhundo ──────────────────────────
+    // Sirf currently applied coupon hi remove hoga
     const couponUsage = await CouponUsage.findOne({
         userId,
-        offerId
-    })
+        offerId,
+        isAvailable: true,
+        isApplied: true,
+    });
 
     if (!couponUsage) {
-        throw new NotFoundError('Coupon not found or already removed')
+        throw new NotFoundError(
+            "Coupon is not applied or cannot be removed."
+        );
     }
 
-    // ─── Delete karo ──────────────────────────────
-    await CouponUsage.findByIdAndDelete(couponUsage._id)
+    await CouponUsage.findByIdAndDelete(couponUsage._id);
 
     res.status(200).json({
         success: true,
-        message: `Coupon "${couponUsage.couponCode}" removed successfully`
-    })
-})
+        message: `Coupon "${couponUsage.couponCode}" removed successfully`,
+    });
+});
 
 module.exports = { applyCoupon, getAvailableCoupon, removeCouponByUser }
 

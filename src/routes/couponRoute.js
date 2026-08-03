@@ -9,4 +9,5 @@ router.get('/all-coupons', authMiddleware, getAvailableCoupon)
 
 router.delete('/remove/:offerId', authMiddleware, removeCouponByUser)
 
+
 module.exports = router
