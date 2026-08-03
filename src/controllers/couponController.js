@@ -99,7 +99,6 @@ const getAvailableCoupon = asyncHandler(async (req, res) => {
     // ─── Step 2: Saare active offers fetch karo ──
     const offers = await Offers.find({ isActive: true })
         .select('-createdAt -updatedAt -__v')
-        .sort({ minimumOrderAmount: 1 })
 
     if (!offers.length) {
         return res.status(200).json({
