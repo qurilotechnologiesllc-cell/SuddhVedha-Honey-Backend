@@ -663,26 +663,17 @@ const removeFromCart = asyncHandler(async (req, res) => {
 const getCartProductCount = asyncHandler(async (req, res) => {
     const { id } = req.user
 
-    // ─── Dono Collections mein userId se dhundo ───
-    const [cart, giftCart] = await Promise.all([
-        Cart.findOne({ userId: id }).select('items'),
-        Giftcart.findOne({ userId: id }).select('items')
-    ])
+    if (!id) {
+        throw new BadRequestError('UserId Not found!')
+    }
 
-    // ─── Count karo ───────────────────────────────
-    const cartCount = cart?.items?.length || 0
-    const giftCartCount = giftCart?.items?.length || 0
-
-    // ─── Total Count ──────────────────────────────
-    const totalCount = cartCount + giftCartCount
+    const cartCount = await Cart.findOne({ userId: id }).select('items').countDocuments()
 
     res.status(200).json({
         success: true,
         message: 'Cart count fetched successfully',
         data: {
-            cartCount,       // ← Normal cart items
-            giftCartCount,   // ← Gift cart items
-            totalCount       // ← Dono ka total
+            cartCount
         }
     })
 })
