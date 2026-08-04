@@ -1,15 +1,15 @@
 const Cart = require('../models/cart.model');
-const Giftcart = require('../models/giftCart.model')
+// const Giftcart = require('../models/giftCart.model')
 const ProductImage = require('../models/productImage.model')
 const ProductVariant = require('../models/productVariant.model')
 const Product = require('../models/product.model')
-const GiftBox = require('../models/giftBox.model')
+// const GiftBox = require('../models/giftBox.model')
 const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } = require('../errors/errorConfig')
 
-const { buildCartCatalog } = require('../services/cartCatalog.service')
+// const { buildCartCatalog } = require('../services/cartCatalog.service')
 
-const buildNormalCart = require('../helpers/buildNormalCart.helper')
-const buildGiftCart = require('../helpers/buildGiftCart.helper')
+// const buildNormalCart = require('../helpers/buildNormalCart.helper')
+// const buildGiftCart = require('../helpers/buildGiftCart.helper')
 
 const addToCart = asyncHandler(async (req, res) => {
     const userId = req.user.id
@@ -130,151 +130,151 @@ const addToCart = asyncHandler(async (req, res) => {
     })
 })
 
-const addToGiftCart = asyncHandler(async (req, res) => {
+// const addToGiftCart = asyncHandler(async (req, res) => {
 
-    const userId = req.user.id;
+//     const userId = req.user.id;
 
-    const {
-        giftBoxId,
-        customMessage = "",
-        quantity,
-        products
-    } = req.body;
+//     const {
+//         giftBoxId,
+//         customMessage = "",
+//         quantity,
+//         products
+//     } = req.body;
 
-    let totalWeight = 0;
-    let calculatedTotalAmount = 0;
-    let save = 0;
+//     let totalWeight = 0;
+//     let calculatedTotalAmount = 0;
+//     let save = 0;
 
-    // -----------------------------
-    // Basic Validation
-    // -----------------------------
+//     // -----------------------------
+//     // Basic Validation
+//     // -----------------------------
 
-    if (!giftBoxId) {
-        throw new BadRequestError("Gift Box and Gift Wrap is required.");
-    }
+//     if (!giftBoxId) {
+//         throw new BadRequestError("Gift Box and Gift Wrap is required.");
+//     }
 
-    if (giftBoxId) {
-        const giftBox = await GiftBox.findById(giftBoxId);
+//     if (giftBoxId) {
+//         const giftBox = await GiftBox.findById(giftBoxId);
 
-        if (!giftBox) {
-            throw new NotFoundError("Gift Box not found.");
-        }
-        calculatedTotalAmount += giftBox.price
-    }
-
-
-    if (!products || !Array.isArray(products) || products.length === 0) {
-        throw new BadRequestError("Please select at least one honey.");
-    }
+//         if (!giftBox) {
+//             throw new NotFoundError("Gift Box not found.");
+//         }
+//         calculatedTotalAmount += giftBox.price
+//     }
 
 
-    const productIds = products.map(item => item.productId);
-
-    const variantDocuments = await ProductVariant.find({
-        product: { $in: productIds }
-    });
-
-    const variantMap = new Map();
-
-    variantDocuments.forEach(doc => {
-        variantMap.set(doc.product.toString(), doc);
-    });
+//     if (!products || !Array.isArray(products) || products.length === 0) {
+//         throw new BadRequestError("Please select at least one honey.");
+//     }
 
 
-    for (const item of products) {
+//     const productIds = products.map(item => item.productId);
 
-        const { productId, selectedWeight } = item;
+//     const variantDocuments = await ProductVariant.find({
+//         product: { $in: productIds }
+//     });
 
-        // Memory se Variant Document nikalo
-        const variantDocument = variantMap.get(productId.toString());
+//     const variantMap = new Map();
 
-        if (!variantDocument) {
-            throw new NotFoundError("Product variant not found.");
-        }
-
-        // Embedded variant find karo
-        const variant = variantDocument.variants.id(selectedWeight);
-
-        if (!variant) {
-            throw new BadRequestError("Selected variant is invalid.");
-        }
-
-        // Weight
-        const weight = parseInt(variant.weight);
-
-        totalWeight += weight;
-
-        // variant Price
-        calculatedTotalAmount += variant.price;
-
-        save += variant.you_save
-
-    }
+//     variantDocuments.forEach(doc => {
+//         variantMap.set(doc.product.toString(), doc);
+//     });
 
 
-    // -----------------------------
-    // Find Gift Cart
-    // -----------------------------
+//     for (const item of products) {
 
-    let giftCart = await Giftcart.findOne({ userId });
+//         const { productId, selectedWeight } = item;
 
-    const newGiftItem = {
+//         // Memory se Variant Document nikalo
+//         const variantDocument = variantMap.get(productId.toString());
 
-        giftBoxId,
+//         if (!variantDocument) {
+//             throw new NotFoundError("Product variant not found.");
+//         }
 
-        customMessage,
+//         // Embedded variant find karo
+//         const variant = variantDocument.variants.id(selectedWeight);
 
-        quantity,
+//         if (!variant) {
+//             throw new BadRequestError("Selected variant is invalid.");
+//         }
 
-        products
+//         // Weight
+//         const weight = parseInt(variant.weight);
 
-    };
+//         totalWeight += weight;
 
-    if (!giftCart) {
+//         // variant Price
+//         calculatedTotalAmount += variant.price;
 
-        giftCart = await Giftcart.create({
+//         save += variant.you_save
 
-            userId,
+//     }
 
-            items: [newGiftItem]
 
-        });
+//     // -----------------------------
+//     // Find Gift Cart
+//     // -----------------------------
 
-    } else {
+//     let giftCart = await Giftcart.findOne({ userId });
 
-        giftCart.items.push(newGiftItem);
+//     const newGiftItem = {
 
-        await giftCart.save();
+//         giftBoxId,
 
-    }
+//         customMessage,
 
-    return res.status(200).json({
+//         quantity,
 
-        success: true,
+//         products
 
-        message: "Gift added to cart successfully.",
+//     };
 
-        data: {
+//     if (!giftCart) {
 
-            giftBoxId,
+//         giftCart = await Giftcart.create({
 
-            quantity,
+//             userId,
 
-            customMessage,
+//             items: [newGiftItem]
 
-            products,
+//         });
 
-            totalWeight,
+//     } else {
 
-            totalAmount: calculatedTotalAmount,
+//         giftCart.items.push(newGiftItem);
 
-            save
+//         await giftCart.save();
 
-        }
+//     }
 
-    });
+//     return res.status(200).json({
 
-});
+//         success: true,
+
+//         message: "Gift added to cart successfully.",
+
+//         data: {
+
+//             giftBoxId,
+
+//             quantity,
+
+//             customMessage,
+
+//             products,
+
+//             totalWeight,
+
+//             totalAmount: calculatedTotalAmount,
+
+//             save
+
+//         }
+
+//     });
+
+// });
 
 // const getCart = asyncHandler(async (req, res) => {
 
