@@ -428,10 +428,6 @@ const increaseQuantity = asyncHandler(async (req, res) => {
         throw new BadRequestError("Item Id is required.");
     }
 
-    // -----------------------------
-    // Normal Cart
-    // -----------------------------
-
     let cart = await Cart.findOne({
 
         userId,
@@ -440,55 +436,23 @@ const increaseQuantity = asyncHandler(async (req, res) => {
 
     });
 
-    if (cart) {
-
-        const item = cart.items.id(itemId);
-
-        item.quantity += 1;
-
-        await cart.save();
-
-        return res.status(200).json({
-
-            success: true,
-
-            message: "Quantity increased successfully."
-
-        });
-
+    if (!cart) {
+        throw new NotFoundError("Cart item not found.");
     }
 
-    // -----------------------------
-    // Gift Cart
-    // -----------------------------
+    const item = cart.items.id(itemId);
 
-    let giftCart = await Giftcart.findOne({
+    item.quantity += 1;
 
-        userId,
+    await cart.save();
 
-        "items._id": itemId
+    return res.status(200).json({
+
+        success: true,
+
+        message: "Quantity increased successfully."
 
     });
-
-    if (giftCart) {
-
-        const item = giftCart.items.id(itemId);
-
-        item.quantity += 1;
-
-        await giftCart.save();
-
-        return res.status(200).json({
-
-            success: true,
-
-            message: "Quantity increased successfully."
-
-        });
-
-    }
-
-    throw new NotFoundError("Cart item not found.");
 
 });
 
@@ -501,10 +465,6 @@ const decreaseQuantity = asyncHandler(async (req, res) => {
         throw new BadRequestError("Item Id is required.");
     }
 
-    // -----------------------------
-    // Normal Cart
-    // -----------------------------
-
     let cart = await Cart.findOne({
 
         userId,
@@ -514,151 +474,74 @@ const decreaseQuantity = asyncHandler(async (req, res) => {
     });
 
 
-    if (cart) {
-
-        const item = cart.items.id(itemId);
-
-        if (item.quantity > 1) {
-
-            item.quantity -= 1;
-
-            await cart.save();
-
-            return res.status(200).json({
-
-                success: true,
-
-                message: "Quantity decrease successfully."
-
-            });
-
-        } else {
-            return res.status(200).json({
-
-                success: true,
-
-                message: "Quantity decrease successfully."
-
-            });
-        }
+    if (!cart) {
+        throw new NotFoundError("Cart item not found.");
     }
 
-    // -----------------------------
-    // Gift Cart
-    // -----------------------------
+    const item = cart.items.id(itemId);
 
-    let giftCart = await Giftcart.findOne({
+    if (item.quantity > 1) {
 
-        userId,
-
-        "items._id": itemId
-
-    });
-
-    if (giftCart) {
-
-        const item = giftCart.items.id(itemId);
-
-        if (item.quantity > 1) {
-
-            item.quantity -= 1;
-
-            await giftCart.save();
-
-            return res.status(200).json({
-
-                success: true,
-
-                message: "Quantity dcrease successfully."
-
-            });
-        } else {
-            return res.status(200).json({
-
-                success: true,
-
-                message: "Quantity dcrease successfully."
-
-            });
-        }
-
-    }
-
-    throw new NotFoundError("Cart item not found.");
-
-});
-
-const removeFromCart = asyncHandler(async (req, res) => {
-
-    const userId = req.user.id;
-    const { itemId } = req.body;
-
-    if (!itemId) {
-        throw new BadRequestError("Item Id is required.");
-    }
-
-    // Find in both collections
-    const [cart, giftCart] = await Promise.all([
-
-        Cart.findOne({
-            userId,
-            "items._id": itemId
-        }),
-
-        Giftcart.findOne({
-            userId,
-            "items._id": itemId
-        })
-
-    ]);
-
-    // -----------------------------
-    // Normal Cart
-    // -----------------------------
-    if (cart) {
-
-        const item = cart.items.id(itemId);
-
-        if (!item) {
-            throw new NotFoundError("Cart item not found.");
-        }
-
-        item.deleteOne();
+        item.quantity -= 1;
 
         await cart.save();
 
         return res.status(200).json({
+
             success: true,
-            message: "Item removed from cart successfully."
+
+            message: "Quantity decrease successfully."
+
         });
 
-    }
-
-    // -----------------------------
-    // Gift Cart
-    // -----------------------------
-    if (giftCart) {
-
-        const item = giftCart.items.id(itemId);
-
-        if (!item) {
-            throw new NotFoundError("Gift cart item not found.");
-        }
-
-        item.deleteOne();
-
-        await giftCart.save();
-
+    } else {
         return res.status(200).json({
+
             success: true,
-            message: "Item removed from gift cart successfully."
+
+            message: "Quantity decrease successfully."
+
         });
-
     }
-
-    throw new NotFoundError("Cart item not found.");
 
 });
+
+const removeFromCart = asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    const { itemId } = req.body
+
+    // ─── Validation ───────────────────────────────
+    if (!itemId) {
+        throw new BadRequestError('Item ID is required')
+    }
+
+    // ─── Cart Dhundo userId + itemId se ──────────
+    const cart = await Cart.findOne({
+        userId,
+        'items._id': itemId
+    })
+
+    if (!cart) {
+        throw new NotFoundError('Cart item not found')
+    }
+
+    // ─── Item Dhundo ──────────────────────────────
+    const item = cart.items.id(itemId)
+
+    if (!item) {
+        throw new NotFoundError('Item not found in cart')
+    }
+
+    // ─── Item Remove karo ─────────────────────────
+    item.deleteOne()
+    await cart.save()
+
+    res.status(200).json({
+        success: true,
+        message: 'Item removed from cart successfully',
+        remainingItems: cart.items.length
+    })
+})
 
 const getCartProductCount = asyncHandler(async (req, res) => {
     const { id } = req.user
@@ -667,7 +550,8 @@ const getCartProductCount = asyncHandler(async (req, res) => {
         throw new BadRequestError('UserId Not found!')
     }
 
-    const cartCount = await Cart.findOne({ userId: id }).select('items').countDocuments()
+    const cart = await Cart.findOne({ userId: id }).select('items')
+    const cartCount = cart.items.length
 
     res.status(200).json({
         success: true,
