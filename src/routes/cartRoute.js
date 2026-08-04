@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getCart, getCartProductCount, addToCart, addToGiftCart, increaseQuantity, decreaseQuantity, removeFromCart } = require('../controllers/cartController');
+const { getCart, getCartProductCount, addToCart, increaseQuantity, decreaseQuantity, removeFromCart } = require('../controllers/cartController');
 const { authMiddleware } = require('../middlewares/authmiddleware');
 
 // Route to get the user's cart
@@ -8,8 +8,6 @@ router.get('/', authMiddleware, getCart);
 
 // Route to add an item to the cart
 router.post('/add', authMiddleware, addToCart);
-
-router.post('/add/customize-product', authMiddleware, addToGiftCart);
 
 router.post('/increase-quantity', authMiddleware, increaseQuantity);
 

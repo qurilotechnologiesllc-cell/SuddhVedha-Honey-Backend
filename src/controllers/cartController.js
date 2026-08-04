@@ -15,7 +15,7 @@ const addToCart = asyncHandler(async (req, res) => {
     const userId = req.user.id
     const { productId, selectedWeight, quantity } = req.body
 
-    // ─── Validation ──────────────────────────────
+    // ─── Validation ───────────────────────────────
     if (!productId || !selectedWeight || !quantity) {
         throw new BadRequestError(
             'productId, selectedWeight and quantity are required'
@@ -26,34 +26,107 @@ const addToCart = asyncHandler(async (req, res) => {
         throw new BadRequestError('Quantity cannot be less than 1')
     }
 
+    // ─── Product Exist Karta Hai? ─────────────────
+    const product = await Product.findById(productId)
+        .select('product_name product_type floral_source imageDocumentId variantDocumentId')
+        .lean()
+
+    if (!product) {
+        throw new NotFoundError('Product not found')
+    }
+
+    // ─── Image Fetch karo ─────────────────────────
+    // imageDocumentId se ProductImage collection mein dhundo
+    const imageDocument = await ProductImage.findById(
+        product.imageDocumentId
+    ).select('images').lean()
+
+    // Sirf primary image lo
+    const primaryImage = imageDocument?.images?.find(
+        img => img.is_primary === true
+    ) || imageDocument?.images?.[0] || null
+
+    // ─── Variant Fetch karo ───────────────────────
+    // variantDocumentId se ProductVariant collection mein dhundo
+    const variantDocument = await ProductVariant.findById(
+        product.variantDocumentId
+    ).select('variants').lean()
+
+    // selectedWeight ID se exact variant dhundo
+    const selectedVariant = variantDocument?.variants?.find(
+        v => v._id.toString() === selectedWeight.toString()
+    ) || null
+
+    if (!selectedVariant) {
+        throw new NotFoundError('Selected variant not found')
+    }
+
     // ─── Cart Dhundo ya Banao ─────────────────────
     let cart = await Cart.findOne({ userId })
     if (!cart) {
         cart = new Cart({ userId, items: [] })
     }
 
-    // ─── Same product + Same weight check ────────
+    // ─── Same product + Same weight check ─────────
     const itemIndex = cart.items.findIndex(item =>
         item.productId.toString() === productId &&
         item.selectedWeight.toString() === selectedWeight
-        //   ↑                              ↑
-        // productId match            selectedWeight bhi match
     )
 
     if (itemIndex > -1) {
         // ✅ Same product + Same weight → quantity badhao
         cart.items[itemIndex].quantity += quantity
     } else {
-        // ✅ Naya item — Different weight ya different product
+        // ✅ Naya item add karo
         cart.items.push({ productId, selectedWeight, quantity })
     }
 
     await cart.save()
 
+    // ─── Response Format karo ─────────────────────
     res.status(200).json({
         success: true,
         message: 'Item added to cart successfully',
-        data: cart
+        data: {
+            cartId: cart._id,
+
+            // ── Added Item Details ─────────────────
+            item: {
+                cartItemId: cart.items[
+                    itemIndex > -1 ? itemIndex : cart.items.length - 1
+                ]._id,
+                quantity: itemIndex > -1
+                    ? cart.items[itemIndex].quantity
+                    : quantity,
+
+                // ── Product Info ───────────────────
+                product: {
+                    productId: product._id,
+                    product_name: product.product_name,
+                    product_type: product.product_type,
+                    floral_source: product.floral_source,
+
+                    // ── Primary Image ──────────────
+                    image: primaryImage ? {
+                        image_url: primaryImage.image_url,
+                        public_id: primaryImage.public_id
+                    } : null,
+                },
+
+                // ── Selected Variant Info ──────────
+                variant: {
+                    variantId: selectedVariant._id,
+                    weight: selectedVariant.weight,
+                    unit: selectedVariant.unit,
+                    price: selectedVariant.price,
+                    mrp: selectedVariant.mrp,
+                    you_save: selectedVariant.you_save,
+                    discount_percentage: selectedVariant.discount_percentage,
+                    stock_status: selectedVariant.stock_status,
+                    available_stock: selectedVariant.available_stock
+                }
+            }
+        }
     })
 })
 
@@ -203,44 +276,147 @@ const addToGiftCart = asyncHandler(async (req, res) => {
 
 });
 
+// const getCart = asyncHandler(async (req, res) => {
+
+//     const userId = req.user.id;
+
+//     const {
+//         cart,
+//         giftCart,
+//         catalogMap,
+//         giftBoxMap
+//     } = await buildCartCatalog(userId);
+
+//     const normalItems = buildNormalCart(
+//         cart,
+//         catalogMap
+//     );
+
+//     const giftItems = buildGiftCart(
+//         giftCart,
+//         catalogMap,
+//         giftBoxMap
+//     );
+
+
+//     res.status(200).json({
+
+//         success: true,
+
+//         items: [
+
+//             ...normalItems,
+
+//             ...giftItems
+
+//         ]
+
+//     });
+
+// });
+
 const getCart = asyncHandler(async (req, res) => {
+    const { id } = req.user
 
-    const userId = req.user.id;
+    // ─── Cart Dhundo userId se ────────────────────
+    const cart = await Cart.findOne({ userId: id }).lean()
 
-    const {
-        cart,
-        giftCart,
-        catalogMap,
-        giftBoxMap
-    } = await buildCartCatalog(userId);
+    // ─── Cart Nahi Hai ────────────────────────────
+    if (!cart || cart.items.length === 0) {
+        return res.status(200).json({
+            success: true,
+            message: 'Cart is empty',
+            totalItems: 0,
+            data: []
+        })
+    }
 
-    const normalItems = buildNormalCart(
-        cart,
-        catalogMap
-    );
+    // ─── Har Item ke liye Details Fetch karo ──────
+    const cartItems = await Promise.all(
+        cart.items.map(async (item) => {
 
-    const giftItems = buildGiftCart(
-        giftCart,
-        catalogMap,
-        giftBoxMap
-    );
+            // ── Product Fetch karo ────────────────
+            const product = await Product.findById(item.productId)
+                .select('product_name product_type floral_source imageDocumentId variantDocumentId')
+                .lean()
 
+            if (!product) return null
+
+            // ── Primary Image Fetch karo ──────────
+            // imageDocumentId se ProductImage collection
+            const imageDocument = await ProductImage.findById(
+                product.imageDocumentId
+            ).select('images').lean()
+
+            const primaryImage = imageDocument?.images?.find(
+                img => img.is_primary === true
+            ) || imageDocument?.images?.[0] || null
+
+            // ── Selected Variant Fetch karo ───────
+            // variantDocumentId se ProductVariant collection
+            const variantDocument = await ProductVariant.findById(
+                product.variantDocumentId
+            ).select('variants').lean()
+
+            // selectedWeight ID se exact variant dhundo
+            const selectedVariant = variantDocument?.variants?.find(
+                v => v._id.toString() === item.selectedWeight.toString()
+            ) || null
+
+            return {
+                cartItemId: item._id,
+                quantity: item.quantity,
+
+                // ── Product Info ──────────────────
+                product: {
+                    productId: product._id,
+                    product_name: product.product_name,
+                    product_type: product.product_type,
+                    floral_source: product.floral_source,
+
+                    // ── Primary Image ─────────────
+                    image: primaryImage ? {
+                        image_url: primaryImage.image_url,
+                        public_id: primaryImage.public_id
+                    } : null
+                },
+
+                // ── Selected Variant Info ─────────
+                variant: selectedVariant ? {
+                    variantId: selectedVariant._id,
+                    weight: selectedVariant.weight,
+                    unit: selectedVariant.unit,
+                    price: selectedVariant.price,
+                    mrp: selectedVariant.mrp,
+                    you_save: selectedVariant.you_save,
+                    discount_percentage: selectedVariant.discount_percentage,
+                    stock_status: selectedVariant.stock_status,
+                    available_stock: selectedVariant.available_stock,
+                    sku: selectedVariant.sku
+                } : null
+            }
+        })
+    )
+
+    // ─── Null Items hatao ─────────────────────────
+    // Agar koi product delete ho gaya ho
+    const validItems = cartItems.filter(item => item !== null)
+
+    // ─── Cart Total Calculate karo ────────────────
+    const cartTotal = validItems.reduce((total, item) => {
+        const price = item.variant?.price || 0
+        const quantity = item.quantity || 0
+        return total + (price * quantity)
+    }, 0)
 
     res.status(200).json({
-
         success: true,
-
-        items: [
-
-            ...normalItems,
-
-            ...giftItems
-
-        ]
-
-    });
-
-});
+        message: 'Cart fetched successfully',
+        totalItems: validItems.length,
+        cartTotal,
+        data: validItems
+    })
+})
 
 const increaseQuantity = asyncHandler(async (req, res) => {
 
@@ -514,7 +690,6 @@ const getCartProductCount = asyncHandler(async (req, res) => {
 
 module.exports = {
     addToCart,
-    addToGiftCart,
     getCart,
     getCartProductCount,
     increaseQuantity,
