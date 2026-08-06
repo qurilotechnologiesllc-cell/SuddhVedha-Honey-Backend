@@ -43,7 +43,9 @@ app.use(cors({
 
     "https://frontend-3000.devtunnels.ms",
      
-    "https://suddhveda-z57g.vercel.app"
+    "https://suddhveda-z57g.vercel.app",
+
+    "https://k8jz7ljm-3000.inc1.devtunnels.ms"
   ],
 
   credentials: true
