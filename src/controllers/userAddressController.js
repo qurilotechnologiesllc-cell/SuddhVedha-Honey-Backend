@@ -4,24 +4,29 @@ const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, Forbidd
 
 const addUserAddress = asyncHandler(async (req, res) => {
     const id = req.user.id
-   const user = await User.findById(id)
-   
+    const user = await User.findById(id)
+
     if (!user) {
         throw new NotFoundError('User not found');
     }
 
-    const { full_name, phone, address_line1, address_line2, city, state, pincode, country, address_type } = req.body;
+    const isAvailable = await Address.findOne({ user_id: id })
+    if (isAvailable) {
+        throw new ConflictError(
+            'You already have a saved address. Please update your existing address instead of adding a new one.'
+        )
+    }
+
+    const { address_line1, address_line2, city, state, pincode, country, address_type } = req.body;
 
     // Validation
-    if (!full_name || !phone || !address_line1 || !city || !state || !pincode || !address_type) {
+    if (!address_line1 || !city || !state || !pincode || !address_type) {
         throw new BadRequestError('All required fields must be provided');
     }
 
     // Create a new address document
     const newAddress = new Address({
         user_id: id,
-        full_name,
-        phone,
         address_line1,
         address_line2,
         city,
@@ -48,12 +53,15 @@ const getUserAddresses = asyncHandler(async (req, res) => {
         throw new NotFoundError('User not found');
     }
 
-    const addresses = await Address.find({ user_id: id });
+    const addresses = await Address.find({ user_id: id }).populate({
+        path: 'user_id',
+        select: 'name mobile email -_id'
+    });
 
     if (!addresses || addresses.length === 0) {
         throw new NotFoundError('No addresses found for this user');
     }
-    
+
     res.status(200).json({
         success: true,
         message: 'Addresses retrieved successfully',
@@ -94,10 +102,10 @@ const updateUserAddress = asyncHandler(async (req, res) => {
     }
 
     const addressId = req.params.addressId;
-    const { full_name, phone, address_line1, address_line2, city, state, pincode, country, address_type } = req.body;
+    const { address_line1, address_line2, city, state, pincode, country, address_type } = req.body;
 
     // Validation
-    if (!full_name || !phone || !address_line1 || !city || !state || !pincode || !address_type) {
+    if (!address_line1 || !city || !state || !pincode || !address_type) {
         throw new BadRequestError('All required fields must be provided');
     }
 
@@ -108,8 +116,6 @@ const updateUserAddress = asyncHandler(async (req, res) => {
     }
 
     // Update the address fields
-    address.full_name = full_name;
-    address.phone = phone;
     address.address_line1 = address_line1;
     address.address_line2 = address_line2;
     address.city = city;
@@ -128,5 +134,5 @@ const updateUserAddress = asyncHandler(async (req, res) => {
 });
 
 
-module.exports = { addUserAddress, getUserAddresses, deleteUserAddress , updateUserAddress}    
+module.exports = { addUserAddress, getUserAddresses, deleteUserAddress, updateUserAddress }
 

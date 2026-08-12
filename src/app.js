@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const { notFoundHandler, errorHandler } = require('./errors/errorConfig');
 const userAuthRoute = require('./routes/userAuthRoute');
 const userAddressRoute = require('./routes/userAddressRoutes');
+const userShippingAddressRoutes = require('./routes/userShippingAddressRoute.js')
 const cartRoute = require('./routes/cartRoute');
 const productRoute = require('./routes/productsRoute');
 const reviewRoute = require('./routes/reviewRoute');
@@ -15,7 +16,7 @@ const videoRoutes = require('./routes/videoRoute');
 const feedbackVideoRoutes = require('./routes/feedbackVideoRoute');
 const filterProductRoutes = require('./routes/filterProductRoute');
 const userEnquiryRoutes = require('./routes/userEnquiryRoutes');
-// const GiftBoxRoutes = require('./routes/giftboxRoute');
+const GiftBoxRoutes = require('./routes/giftboxRoute');
 const OfferRoutes = require('./routes/offerRoutes');
 const CouponRoutes = require('./routes/couponRoute');
 const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
@@ -72,6 +73,7 @@ app.get("/socket-test", (req, res) => {
 // User authentication routes
 app.use('/api/users', userAuthRoute);
 app.use('/api/addresses', userAddressRoute);
+app.use('/api/shipping/addresses', userShippingAddressRoutes);
 app.use('/api/cart', cartRoute);
 app.use('/api/products', productRoute);
 app.use('/api/reviews', reviewRoute);
@@ -82,7 +84,7 @@ app.use('/api/feedback', feedbackVideoRoutes);
 app.use('/api/filter', filterProductRoutes);
 app.use('/api/enquiry', userEnquiryRoutes);
 app.use('/api/offers', OfferRoutes);
-// app.use('/api/admin', GiftBoxRoutes);
+app.use('/api/admin', GiftBoxRoutes);
 app.use('/api/coupon', CouponRoutes);
 app.use('/api/benefits', honeyBenefitsRoutes);
 app.use('/api/location', OurlocationRoutes);

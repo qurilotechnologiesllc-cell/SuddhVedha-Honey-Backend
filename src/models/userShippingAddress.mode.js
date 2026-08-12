@@ -1,14 +1,29 @@
 const { Schema, model } = require('mongoose')
+
 const mongoose = require('mongoose')
 
-const userAddressSchema = new Schema({
-
+const UserShippingAddressesSchema = new Schema({
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-        unique: true,  // ← Ek user = ek hi address! ✅
         index: true
+    },
+
+    full_name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+
+    phone_number: {
+        type: String,
+        required: true,
+        trim: true,
+        match: [
+            /^[6-9][0-9]{9}$/,
+            'Please provide a valid 10 digit phone number'
+        ]
     },
 
     address_line1: {
@@ -51,8 +66,15 @@ const userAddressSchema = new Schema({
         type: String,
         enum: ['home', 'work', 'other'],
         default: 'home'
+    },
+
+    is_default: {
+        type: Boolean,
+        default: false
     }
+},
+    { timestamps: true }
+)
 
-}, { timestamps: true })
+module.exports = model('UserShippingAddresses', UserShippingAddressesSchema)
 
-module.exports = model('UserAddress', userAddressSchema)

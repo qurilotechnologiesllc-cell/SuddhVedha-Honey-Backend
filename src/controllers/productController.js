@@ -140,6 +140,97 @@ const getAllProducts = asyncHandler(async (req, res) => {
     });
 });
 
+const getAllProductByweight = asyncHandler(async (req, res) => {
+    const { weight } = req.body
+
+    // ─── Validation ───────────────────────────────
+    if (!weight) {
+        throw new BadRequestError('Weight is required')
+    }
+
+    // ─── Saare Active Products Fetch karo ─────────
+    const products = await Product.find({ is_active: true })
+        .select('product_name brand product_type floral_source variantDocumentId imageDocumentId')
+        .lean()
+
+    if (!products.length) {
+        return res.status(200).json({
+            success: true,
+            message: 'No products found',
+            total: 0,
+            data: []
+        })
+    }
+
+    // ─── Har Product ke liye Weight Match karo ────
+    const matchedProducts = []
+
+    await Promise.all(
+        products.map(async (product) => {
+
+            // variantDocumentId se Variants fetch karo
+            const variantDoc = await ProductVariant.findById(
+                product.variantDocumentId
+            ).select('variants').lean()
+
+            if (!variantDoc) return
+
+            // Variants array mein weight match karo
+            const matchedVariant = variantDoc.variants.find(
+                v => Number(v.weight) === Number(weight)
+            )
+
+            // Weight match hua?
+            if (matchedVariant) {
+                matchedProducts.push({
+
+                    // ── Product Info ──────────────
+                    productId: product._id,
+                    product_name: product.product_name,
+                    brand: product.brand,
+                    product_type: product.product_type,
+                    floral_source: product.floral_source,
+
+                    // ── Matched Variant Info ──────
+                    variant: {
+                        variantId: matchedVariant._id,
+                        weight: matchedVariant.weight,
+                        unit: matchedVariant.unit,
+                        price: matchedVariant.price,
+                        mrp: matchedVariant.mrp,
+                        you_save: matchedVariant.you_save,
+                        discount_percentage: matchedVariant.discount_percentage,
+                        discount_type: matchedVariant.discount_type,
+                        tax: matchedVariant.tax,
+                        sku: matchedVariant.sku,
+                        stock_status: matchedVariant.stock_status,
+                        available_stock: matchedVariant.available_stock,
+                        allow_backorders: matchedVariant.allow_backorders
+                    }
+                })
+            }
+        })
+    )
+
+    // ─── Koi Match Nahi Mila ──────────────────────
+    if (!matchedProducts.length) {
+        return res.status(200).json({
+            success: true,
+            message: `No products found with weight: ${weight}`,
+            total: 0,
+            data: []
+        })
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Products fetched successfully',
+        searchedWeight: weight,
+        total: matchedProducts.length,
+        data: matchedProducts
+    })
+});
+
 const getProductsByPagination = asyncHandler(async (req, res) => {
 
     // ─── Page aur Limit Query se lo ─────────────
@@ -1069,13 +1160,15 @@ const removeProductByAdmin = asyncHandler(async (req, res) => {
         success: true,
         message: 'Product removed successfully'
     })
-})
+});
+
 
 
 module.exports = {
     createProduct,
     getAllProducts,
     getProductsByPagination,
+    getAllProductByweight,
     getProductById,
     uploadProductImages,
     createProductVariant,

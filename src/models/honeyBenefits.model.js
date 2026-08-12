@@ -10,29 +10,28 @@ const honeyBenefitsSchema = new mongoose.Schema({
         // "Boosts Immunity", "Rich in Antioxidants"
     },
 
-    description: {
-        type: String,
-        required: [true, 'Description is required'],
-        trim: true,
-        maxLength: [500, 'Description cannot exceed 500 characters']
-    },
-
     category: {
         type: String,
         required:true,
         enum:['healthy', 'benefits']
     },
 
-    image: {
-        type: String,
-        required: [true, 'Image is required']
-        // Cloudinary secure_url
-    },
-
     public_id: {
         type: String,
-        required: [true, 'Public ID is required']
-        // Cloudinary public_id — delete ke liye
+        required: true,
+        trim: true
+    },
+
+    duration: {
+        type: Number,
+        required: true,
+        min: 0
+    },
+
+    format: {
+        type: String,
+        required: true,
+        trim: true
     },
 
     isActive: {

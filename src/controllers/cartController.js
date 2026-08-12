@@ -1,9 +1,9 @@
 const Cart = require('../models/cart.model');
-// const Giftcart = require('../models/giftCart.model')
+const Giftcart = require('../models/giftCart.model')
 const ProductImage = require('../models/productImage.model')
 const ProductVariant = require('../models/productVariant.model')
 const Product = require('../models/product.model')
-// const GiftBox = require('../models/giftBox.model')
+const GiftBox = require('../models/giftBox.model')
 const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } = require('../errors/errorConfig')
 
 // const { buildCartCatalog } = require('../services/cartCatalog.service')
