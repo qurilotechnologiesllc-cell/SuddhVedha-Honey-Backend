@@ -18,11 +18,6 @@ const giftCartSchema = new Schema({
                 required: true
             },
 
-            customMessage: {
-                type: String,
-                default: ""
-            },
-
             quantity: {
                 type: Number,
                 default: 1,
