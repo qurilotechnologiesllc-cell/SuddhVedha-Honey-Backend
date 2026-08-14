@@ -94,8 +94,6 @@ const buildGiftCart = (
 
             quantity: item.quantity,
 
-            couponId: item.couponId || null,
-
             coupon: offer
                 ? {
                     _id: offer._id,
