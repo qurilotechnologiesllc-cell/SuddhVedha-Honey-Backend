@@ -14,6 +14,17 @@ const couponUsageSchema = new mongoose.Schema(
             required: true
         },
 
+        itemId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true
+        },
+
+        itemType: {
+            type: String,
+            enum: ["NORMAL", "CUSTOM"],
+            required: true
+        },
+
         couponCode: {
             type: String,
             required: true,

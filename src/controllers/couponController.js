@@ -1,86 +1,171 @@
 const Offers = require('../models/offer.model')
 const CouponUsage = require('../models/couponUsage.model')
+const Cart = require('../models/cart.model')
+const Giftcart = require('../models/giftCart.model')
 const { asyncHandler, BadRequestError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
 const applyCoupon = asyncHandler(async (req, res) => {
 
-    const { couponCode, cartAmount, shippingCharge = 0 } = req.body;
-    const userId = req.user.id
+    const {
+        couponCode,
+        itemId,
+        itemType
+    } = req.body;
+
+    const userId = req.user.id;
+
+    // ─────────────────────────────────────
+    // Validate
+    // ─────────────────────────────────────
+
+    if (!couponCode) {
+        throw new BadRequestError("Coupon code is required");
+    }
+
+    if (!itemId) {
+        throw new BadRequestError("Item id is required");
+    }
+
+    if (!itemType) {
+        throw new BadRequestError("Item type is required");
+    }
+
+    if (!["NORMAL", "CUSTOM"].includes(itemType)) {
+        throw new BadRequestError(
+            "Invalid item type"
+        );
+    }
+
+
+    // ─────────────────────────────────────
+    // Find Coupon
+    // ─────────────────────────────────────
 
     const offer = await Offers.findOne({
-        couponCode: couponCode.toUpperCase(),
-        isActive: true,
+        couponCode: couponCode.trim().toUpperCase(),
+        isActive: true
     });
 
     if (!offer) {
         throw new NotFoundError("Invalid coupon");
     }
 
-    // ─── Already Use Kiya Check ──────────────────
+
+    // ─────────────────────────────────────
+    // Already Used
+    // ─────────────────────────────────────
+
     const alreadyUsed = await CouponUsage.findOne({
-        userId,                              // Is user ne
-        couponCode: couponCode.toUpperCase() // Yeh coupon
-    })
+        userId,
+        offerId: offer._id
+    });
 
     if (alreadyUsed) {
         throw new ConflictError(
-            `You have already used coupon "${couponCode.toUpperCase()}"`
-        )
+            `You have already used coupon "${offer.couponCode}"`
+        );
     }
 
-    let discount = 0;
-    let shipping = shippingCharge;
 
-    switch (offer.discountType) {
+    // ─────────────────────────────────────
+    // NORMAL → Cart
+    // ─────────────────────────────────────
 
-        case "FLAT":
-            discount = offer.discountValue;
-            break;
+    if (itemType === "NORMAL") {
 
-        case "PERCENTAGE":
-            discount =
-                (cartAmount * offer.discountValue) / 100;
-            break;
+        const cart = await Cart.findOne({
+            userId,
+            "items._id": itemId
+        });
 
-        case "FREE_SHIPPING":
-            shipping = 0;
-            break;
+        if (!cart) {
+            throw new NotFoundError(
+                "Cart item not found"
+            );
+        }
+
+        const item = cart.items.id(itemId);
+
+        if (!item) {
+            throw new NotFoundError(
+                "Cart item not found"
+            );
+        }
+
+        if (item.couponId) {
+            throw new ConflictError(
+                "Coupon already applied on this item"
+            );
+        }
+
+        // Apply coupon ID
+        item.couponId = offer._id;
+
+        await cart.save();
     }
 
-    const finalAmount = Math.max(
-        cartAmount - discount + shipping,
-        0
-    );
+
+    // ─────────────────────────────────────
+    // CUSTOM → GiftCart
+    // ─────────────────────────────────────
+
+    if (itemType === "CUSTOM") {
+
+        const giftCart = await Giftcart.findOne({
+            userId,
+            "items._id": itemId
+        });
+
+        if (!giftCart) {
+            throw new NotFoundError(
+                "Gift cart item not found"
+            );
+        }
+
+        const item = giftCart.items.id(itemId);
+
+        if (!item) {
+            throw new NotFoundError(
+                "Gift cart item not found"
+            );
+        }
+
+        if (item.couponId) {
+            throw new ConflictError(
+                "Coupon already applied on this item"
+            );
+        }
+
+        // Apply coupon ID
+        item.couponId = offer._id;
+
+        await giftCart.save();
+    }
+
+
+    // ─────────────────────────────────────
+    // Save Coupon Usage
+    // ─────────────────────────────────────
 
     await CouponUsage.create({
         userId,
         offerId: offer._id,
-        isApplied: true,
-        couponCode: couponCode.toUpperCase().trim(),
-    })
+        itemId,
+        itemType,
+        couponCode: offer.couponCode,
+        isAvailable: true,
+        isApplied: true
+    });
 
-    res.status(200).json({
+
+    // ─────────────────────────────────────
+    // Response
+    // ─────────────────────────────────────
+
+    return res.status(200).json({
         success: true,
-        message: 'Coupon applied successfully',
-        data: {
-            couponCode: offer.couponCode,
-            title: offer.title,
-            discountType: offer.discountType,
-            discountValue: offer.discountValue,
-            discount,
-            originalAmount: cartAmount,
-            shipping,
-            finalAmount,
-
-            // Frontend ke liye display info
-            display: {
-                label: offer.discountType === 'FREE_SHIPPING'
-                    ? 'FREE DELIVERY'
-                    : `₹${discount} OFF`,
-                description: offer.title
-            }
-        }
-    })
+        message: "Coupon applied successfully"
+    });
 });
 
 const getAvailableCoupon = asyncHandler(async (req, res) => {
@@ -149,10 +234,15 @@ const getAvailableCoupon = asyncHandler(async (req, res) => {
 });
 
 const removeCouponByUser = asyncHandler(async (req, res) => {
+
     const userId = req.user.id;
     const { offerId } = req.params;
 
-    // Sirf currently applied coupon hi remove hoga
+
+    // ─────────────────────────────────────
+    // Find Applied Coupon Usage
+    // ─────────────────────────────────────
+
     const couponUsage = await CouponUsage.findOne({
         userId,
         offerId,
@@ -166,9 +256,91 @@ const removeCouponByUser = asyncHandler(async (req, res) => {
         );
     }
 
-    await CouponUsage.findByIdAndDelete(couponUsage._id);
 
-    res.status(200).json({
+    const {
+        itemId,
+        itemType
+    } = couponUsage;
+
+
+    // ─────────────────────────────────────
+    // NORMAL → Cart
+    // ─────────────────────────────────────
+
+    if (itemType === "NORMAL") {
+
+        const cart = await Cart.findOne({
+            userId,
+            "items._id": itemId
+        });
+
+        if (!cart) {
+            throw new NotFoundError(
+                "Cart item not found."
+            );
+        }
+
+        const item = cart.items.id(itemId);
+
+        if (!item) {
+            throw new NotFoundError(
+                "Cart item not found."
+            );
+        }
+
+        // Remove coupon from cart item
+        item.couponId = null;
+
+        await cart.save();
+    }
+
+
+    // ─────────────────────────────────────
+    // CUSTOM → GiftCart
+    // ─────────────────────────────────────
+
+    else if (itemType === "CUSTOM") {
+
+        const giftCart = await Giftcart.findOne({
+            userId,
+            "items._id": itemId
+        });
+
+        if (!giftCart) {
+            throw new NotFoundError(
+                "Gift cart item not found."
+            );
+        }
+
+        const item = giftCart.items.id(itemId);
+
+        if (!item) {
+            throw new NotFoundError(
+                "Gift cart item not found."
+            );
+        }
+
+        // Remove coupon from gift cart item
+        item.couponId = null;
+
+        await giftCart.save();
+    }
+
+
+    // ─────────────────────────────────────
+    // Remove Coupon Usage
+    // ─────────────────────────────────────
+
+    await CouponUsage.findByIdAndDelete(
+        couponUsage._id
+    );
+
+
+    // ─────────────────────────────────────
+    // Response
+    // ─────────────────────────────────────
+
+    return res.status(200).json({
         success: true,
         message: `Coupon "${couponUsage.couponCode}" removed successfully`,
     });
