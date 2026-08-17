@@ -23,6 +23,7 @@ const honeyBenefitsRoutes = require('./routes/honeyBenefitsRoute');
 const OurlocationRoutes = require('./routes/ourlocationRoute');
 const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
 const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
+const InfluencerDetails = require('./routes/InfluencerDetailsRoute.js')
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
@@ -91,6 +92,7 @@ app.use('/api/benefits', honeyBenefitsRoutes);
 app.use('/api/location', OurlocationRoutes);
 app.use('/api/upcoming', UpcomingProductRoutes);
 app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
+app.use('/api/influencer', InfluencerDetails);
 
 // Admin Routes
 app.use('/api/admin', adminAuthRoutes);
