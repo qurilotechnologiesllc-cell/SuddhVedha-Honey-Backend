@@ -28,6 +28,7 @@ const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 const adminAuthRoutes = require('./routes/adminAuthRoute');
 const productDashboardRoutes = require('./routes/productDashboardRoute');
 const notificationRoutes = require('./routes/notificationRoute');
+const SubscripationsPlans = require('./routes/plansRoute.js')
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -38,17 +39,17 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(cors({
 
   origin: [
-    "http://localhost:3000",
+    "http://localhost:3050",
 
-    "http://localhost:3001",
+    "http://localhost:3051",
 
-    "https://frontend-3000.devtunnels.ms",
+    "https://frontend-3050.devtunnels.ms",
 
     "https://suddhveda-z57g.vercel.app",
 
     "https://suddhveda.vercel.app",
 
-    "https://k8jz7ljm-3000.inc1.devtunnels.ms"
+    "https://k8jz7ljm-3051.inc1.devtunnels.ms"
   ],
 
   credentials: true
@@ -95,6 +96,7 @@ app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
 app.use('/api/admin', adminAuthRoutes);
 app.use('/api/dashboard', productDashboardRoutes);
 app.use('/api/notification', notificationRoutes);
+app.use('/api/subscripation/plan', SubscripationsPlans)
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
