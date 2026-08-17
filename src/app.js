@@ -48,6 +48,8 @@ app.use(cors({
 
     "https://suddhveda-z57g.vercel.app",
 
+    "https://shuddhvedahoney.com",
+
     "https://suddhveda.vercel.app",
 
     "https://k8jz7ljm-3051.inc1.devtunnels.ms"
