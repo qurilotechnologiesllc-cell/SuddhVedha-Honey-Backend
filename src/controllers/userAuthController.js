@@ -122,7 +122,7 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 
     // OTP bhejo
-    await sendOtp(mobile, otp);
+    // await sendOtp(mobile, otp);
 
     console.log(otp);
 
