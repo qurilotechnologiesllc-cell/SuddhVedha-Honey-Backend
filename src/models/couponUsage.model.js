@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const couponUsageSchema = new mongoose.Schema(
     {
+
         userId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
@@ -14,15 +15,10 @@ const couponUsageSchema = new mongoose.Schema(
             required: true
         },
 
-        itemId: {
+        orderId: {
             type: mongoose.Schema.Types.ObjectId,
-            required: true
-        },
-
-        itemType: {
-            type: String,
-            enum: ["NORMAL", "CUSTOM"],
-            required: true
+            ref: "OrderGroup",
+            default: null
         },
 
         couponCode: {
@@ -45,12 +41,28 @@ const couponUsageSchema = new mongoose.Schema(
     },
     {
         timestamps: true
-    })
-
-// One user can use one coupon only once
-couponUsageSchema.index(
-    { userId: 1, couponCode: 1 },
-    { unique: true }
+    }
 );
 
-module.exports = mongoose.model("CouponUsage", couponUsageSchema);
+
+/*
+|--------------------------------------------------------------------------
+| One user can use one coupon only once
+|--------------------------------------------------------------------------
+*/
+
+couponUsageSchema.index(
+    {
+        userId: 1,
+        couponCode: 1
+    },
+    {
+        unique: true
+    }
+);
+
+
+module.exports = mongoose.model(
+    "CouponUsage",
+    couponUsageSchema
+);

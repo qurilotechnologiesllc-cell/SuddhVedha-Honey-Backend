@@ -1,6 +1,8 @@
 const Order = require('../models/orders.model');
 const Ordergroup = require('../models/orderGoup.model')
 const User = require('../models/user.model')
+const Offers = require('../models/offer.model')
+const CouponUsage = require('../models/couponUsage.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
@@ -90,6 +92,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     const {
         items,
         finalAmount,
+        couponCode,
         shipping_address,
         billing_address,
         payment_mode,
@@ -139,6 +142,8 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     |
     */
 
+    
+
     const calculatedAmount =
         items.reduce(
             (total, item) => {
@@ -155,22 +160,221 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         );
 
 
+    let couponDiscount = 0;
+    let appliedCoupon = null;
+    let couponUsage = null;
+
     /*
     |--------------------------------------------------------------------------
     | 7. Verify Final Amount
     |--------------------------------------------------------------------------
     */
+    if (couponCode) {
 
-    if (
-        Math.round(calculatedAmount * 100) !==
-        Math.round(finalAmount * 100)
-    ) {
+        const normalizedCouponCode =
+            couponCode
+                .trim()
+                .toUpperCase();
 
-        throw new BadRequestError(
-            "Order amount mismatch"
-        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find Offer
+        |--------------------------------------------------------------------------
+        */
+
+        const offer =
+            await Offers.findOne({
+
+                couponCode:
+                    normalizedCouponCode,
+
+                isActive:
+                    true
+
+            });
+
+
+        if (!offer) {
+            throw new BadRequestError(
+                "Invalid or inactive coupon code"
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check User Coupon Usage
+        |--------------------------------------------------------------------------
+        */
+
+        couponUsage =
+            await CouponUsage.findOne({
+
+                userId:
+                    user._id,
+
+                offerId:
+                    offer._id,
+
+                isApplied:
+                    true,
+
+                isAvailable:
+                    true
+
+            });
+
+
+        if (!couponUsage) {
+
+            throw new BadRequestError(
+                "Coupon has not been applied"
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calculate Discount
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            offer.discountType ===
+            "PERCENTAGE"
+        ) {
+
+            couponDiscount =
+                (
+                    calculatedAmount *
+                    offer.discountValue
+                ) / 100;
+
+        }
+        else if (
+            offer.discountType ===
+            "FLAT"
+        ) {
+
+            couponDiscount =
+                offer.discountValue;
+
+        }
+        else {
+
+            throw new BadRequestError(
+                "Invalid coupon discount type"
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent Negative Amount
+        |--------------------------------------------------------------------------
+        */
+
+        couponDiscount =
+            Math.min(
+                couponDiscount,
+                calculatedAmount
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Round Amount
+        |--------------------------------------------------------------------------
+        */
+
+        couponDiscount =
+            Math.round(
+                couponDiscount * 100
+            ) / 100;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Final Amount
+        |--------------------------------------------------------------------------
+        */
+
+        const expectedFinalAmount =
+            Math.round(
+                (
+                    calculatedAmount -
+                    couponDiscount
+                ) * 100
+            ) / 100;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Frontend Amount
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            Math.round(finalAmount * 100) !==
+            Math.round(expectedFinalAmount * 100)
+        ) {
+
+            throw new BadRequestError(
+                `Final amount mismatch. Expected: ${expectedFinalAmount}, Received: ${finalAmount}`
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prepare Coupon Snapshot
+        |--------------------------------------------------------------------------
+        */
+
+        appliedCoupon = {
+
+            offerId:
+                offer._id,
+
+            couponCode:
+                offer.couponCode,
+
+            discountType:
+                offer.discountType,
+
+            discountValue:
+                offer.discountValue,
+
+            discountAmount:
+                couponDiscount
+
+        };
+
+    } else {
+
+        /*
+        |--------------------------------------------------------------------------
+        | No Coupon
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            Math.round(finalAmount * 100) !==
+            Math.round(calculatedAmount * 100)
+        ) {
+
+            throw new BadRequestError(
+                `Final amount mismatch. Expected: ${calculatedAmount}, Received: ${finalAmount}`
+            );
+
+        }
 
     }
+   
 
 
     /*
@@ -268,6 +472,23 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
             orderIds: [],
 
+            totalAmount: calculatedAmount,
+
+            coupon:
+                appliedCoupon || {
+
+                    offerId: null,
+
+                    couponCode: null,
+
+                    discountType: null,
+
+                    discountValue: 0,
+
+                    discountAmount: 0
+
+                },
+
             finalAmount: finalAmount,
 
             payment_mode,
@@ -278,6 +499,21 @@ const createOrderByUser = asyncHandler(async (req, res) => {
             payment: {}
 
         });
+
+    if (couponUsage) {
+
+        couponUsage.orderId =
+            orderGroup._id;
+
+        couponUsage.isApplied =
+            true;
+
+        couponUsage.isAvailable =
+            false;
+
+        await couponUsage.save();
+
+    }
 
 
     /*

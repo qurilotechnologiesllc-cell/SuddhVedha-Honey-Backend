@@ -19,9 +19,50 @@ const orderGroupSchema = new mongoose.Schema({
         ref: "Order"
     }],
 
+    totalAmount: {
+        type: Number,
+        required: true
+    },
+
     finalAmount: {
         type: Number,
         required: true
+    },
+
+    coupon: {
+
+        offerId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Offer",
+            default: null
+        },
+
+        couponCode: {
+            type: String,
+            default: null,
+            uppercase: true,
+            trim: true
+        },
+
+        discountType: {
+            type: String,
+            enum: [
+                "PERCENTAGE",
+                "FLAT"
+            ],
+            default: null
+        },
+
+        discountValue: {
+            type: Number,
+            default: 0
+        },
+
+        discountAmount: {
+            type: Number,
+            default: 0
+        }
+
     },
 
     payment_mode: {
