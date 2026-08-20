@@ -1,6 +1,7 @@
 const Order = require('../models/orders.model');
 const User = require('../models/user.model')
 const crypto = require('crypto')
+const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
 const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCart.service');
 const { updateStockAfterOrder } = require('../services/updateStockAfterOrder')
@@ -49,8 +50,6 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         shipping_address,
         billing_address,
         payment_mode,
-        payment_status,
-        payment,
         customer_note
     } = req.body
 
@@ -143,51 +142,6 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 9. Validate Payment Status
-    |--------------------------------------------------------------------------
-    */
-
-    const allowedPaymentStatuses = [
-        'pending',
-        'processing',
-        'paid',
-        'failed',
-        'cancelled',
-        'refunded',
-        'partially_refunded'
-    ]
-
-    if (
-        payment_status &&
-        !allowedPaymentStatuses.includes(payment_status)
-    ) {
-        throw new BadRequestError(
-            `Invalid payment status: ${payment_status}`
-        )
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | 10. Payment Details
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        payment !== undefined &&
-        (
-            payment === null ||
-            typeof payment !== 'object' ||
-            Array.isArray(payment)
-        )
-    ) {
-        throw new BadRequestError(
-            'Invalid payment details'
-        )
-    }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -197,6 +151,131 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
     const order_id = generateOrderId()
 
+
+    if (payment_mode === "cod") {
+
+        const order = await Order.create({
+
+            order_id,
+
+            userId: user._id,
+
+            items,
+
+            finalAmount,
+
+            shipping_address,
+
+            billing_address,
+
+            payment_mode,
+
+            payment_status: "pending",
+
+            payment: {},
+
+            order_status: "processing",
+
+            inventory_status: "reserved",
+
+            customer_note: customer_note || ""
+
+        });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove Cart
+        |--------------------------------------------------------------------------
+        */
+
+        await removeOrderedItemsFromCart(
+            user._id,
+            items
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Stock
+        |--------------------------------------------------------------------------
+        */
+
+        await updateStockAfterOrder(
+            order.items
+        );
+
+
+        return res.status(201).json({
+
+            success: true,
+
+            message: "COD order created successfully",
+
+            payment_required: false,
+
+            order: {
+
+                _id: order._id,
+
+                order_id: order.order_id,
+
+                finalAmount: order.finalAmount,
+
+                payment_mode: order.payment_mode,
+
+                payment_status:
+                    order.payment_status,
+
+                order_status:
+                    order.order_status
+
+            }
+
+        });
+
+    }
+
+    const razorpayAmount =
+        Math.round(finalAmount * 100);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 11. Create Razorpay Order
+    |--------------------------------------------------------------------------
+    */
+
+    const razorpayOrder =
+        await razorpay.orders.create({
+
+            amount: razorpayAmount,
+
+            currency: "INR",
+
+            receipt: order_id,
+
+            notes: {
+
+                user_id: String(user._id),
+
+                internal_order_id: order_id
+
+            },
+
+            partial_payment: false
+
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 12. Razorpay Order Created
+    |--------------------------------------------------------------------------
+    |
+    | Ab Razorpay order successfully create ho gaya.
+    |
+    */
 
     /*
     |--------------------------------------------------------------------------
@@ -220,17 +299,23 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         payment_mode,
 
-        payment_status: payment_status || 'pending',
+        payment_status: "pending",
 
-        payment: payment || {},
+        payment: {
 
-        order_status: 'processing',
+            razorpay_order_id:
+                razorpayOrder.id
 
-        inventory_status: 'reserved',
+        },
 
-        customer_note: customer_note || ''
+        order_status: "processing",
 
-    })
+        inventory_status: "reserved",
+
+        customer_note:
+            customer_note || ""
+
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -260,28 +345,69 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         success: true,
 
-        message: 'Order created successfully',
+        message:
+            "Razorpay order and database order created successfully",
+
+        payment_required: true,
 
         order: {
+
             _id: order._id,
+
             order_id: order.order_id,
-            userId: order.userId,
-            items: order.items,
-            finalAmount: order.finalAmount,
 
-            shipping_address: order.shipping_address,
-            billing_address: order.billing_address,
+            razorpay_order_id:
+                razorpayOrder.id,
 
-            payment_mode: order.payment_mode,
-            payment_status: order.payment_status,
-            payment: order.payment,
+            amount:
+                razorpayOrder.amount,
 
-            order_status: order.order_status,
-            inventory_status: order.inventory_status,
+            currency:
+                razorpayOrder.currency,
 
-            createdAt: order.createdAt
+            receipt:
+                razorpayOrder.receipt,
+
+            finalAmount:
+                order.finalAmount,
+
+            payment_mode:
+                order.payment_mode,
+
+            payment_status:
+                order.payment_status,
+
+            payment:
+                order.payment,
+
+            order_status:
+                order.order_status,
+
+            inventory_status:
+                order.inventory_status,
+
+            createdAt:
+                order.createdAt
+
+        },
+
+        razorpay: {
+
+            key_id:
+                process.env.RAZORPAY_KEY_ID,
+
+            order_id:
+                razorpayOrder.id,
+
+            amount:
+                razorpayOrder.amount,
+
+            currency:
+                razorpayOrder.currency
+
         }
-    })
+
+    });
 })
 
 const getMyordersDetails = asyncHandler(async (req, res) => {
@@ -366,8 +492,516 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
     })
 })
 
+const razorpayWebhooks = asyncHandler(async (req, res) => {
+
+    const webhookSignature = req.headers["x-razorpay-signature"];
+
+
+    if (!webhookSignature) {
+
+        return res.status(400).json({
+
+            success: false,
+
+            message: "Razorpay webhook signature missing"
+
+        });
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Raw Webhook Body
+    |--------------------------------------------------------------------------
+    */
+
+    const rawBody = req.body;
+
+
+    if (!Buffer.isBuffer(rawBody)) {
+
+        return res.status(400).json({
+
+            success: false,
+
+            message:
+                "Invalid webhook body"
+
+        });
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Generate Expected Signature
+    |--------------------------------------------------------------------------
+    */
+
+    const expectedSignature =
+        crypto
+            .createHmac(
+                "sha256",
+                process.env.RAZORPAY_WEBHOOK_SECRET
+            )
+            .update(rawBody)
+            .digest("hex");
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 4. Compare Signature
+    |--------------------------------------------------------------------------
+    */
+
+    const isValidSignature =
+        expectedSignature.length ===
+        webhookSignature.length &&
+        crypto.timingSafeEqual(
+            Buffer.from(expectedSignature),
+            Buffer.from(webhookSignature)
+        );
+
+
+    if (!isValidSignature) {
+
+        return res.status(400).json({
+
+            success: false,
+
+            message:
+                "Invalid Razorpay webhook signature"
+
+        });
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Parse Body AFTER Signature Verification
+    |--------------------------------------------------------------------------
+    */
+
+    const webhookData = JSON.parse(rawBody.toString("utf8"));
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 6. Get Event
+    |--------------------------------------------------------------------------
+    */
+
+    const event = webhookData.event;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Razorpay Event ID
+    |--------------------------------------------------------------------------
+    */
+
+    const eventId = req.headers["x-razorpay-event-id"];
+
+
+    console.log(
+        "Razorpay Webhook:",
+        event
+    );
+
+    console.log(
+        "Razorpay Event ID:",
+        eventId
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 8. Handle Events
+    |--------------------------------------------------------------------------
+    */
+
+    switch (event) {
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT AUTHORIZED
+        |--------------------------------------------------------------------------
+        */
+
+        case "payment.authorized": {
+
+            const payment = webhookData?.payload?.payment?.entity;
+
+
+            if (!payment) {
+                break;
+            }
+
+
+            const razorpayOrderId = payment.order_id;
+
+
+            const order =
+                await Order.findOne({
+                    "payment.razorpay_order_id":
+                        razorpayOrderId
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found:",
+                    razorpayOrderId
+                );
+
+                break;
+
+            }
+
+
+            await Order.updateOne(
+
+                {
+                    _id: order._id
+                },
+
+                {
+                    $set: {
+
+                        payment_status:
+                            "processing",
+
+                        "payment.razorpay_payment_id":
+                            payment.id,
+
+                        "payment.method":
+                            payment.method,
+
+                        "payment.amount":
+                            payment.amount,
+
+                        "payment.currency":
+                            payment.currency,
+
+                        "payment.status":
+                            payment.status
+
+                    }
+
+                }
+
+            );
+
+            break;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT CAPTURED
+        |--------------------------------------------------------------------------
+        */
+
+        case "payment.captured": {
+
+            const payment = webhookData?.payload?.payment?.entity;
+
+
+            if (!payment) {
+                break;
+            }
+
+
+            const razorpayOrderId = payment.order_id;
+
+
+            const order = await Order.findOne({ "payment.razorpay_order_id": razorpayOrderId});
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found:",
+                    razorpayOrderId
+                );
+
+                break;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Amount Validation
+            |--------------------------------------------------------------------------
+            */
+
+            const expectedAmount = Math.round(order.finalAmount * 100);
+
+
+            if ( payment.amount !== expectedAmount) {
+
+                console.error("Payment amount mismatch",
+                    {
+                        orderId:
+                            order.order_id,
+
+                        expected:
+                            expectedAmount,
+
+                        received:
+                            payment.amount
+                    }
+                );
+
+                break;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Payment
+            |--------------------------------------------------------------------------
+            */
+
+            await Order.updateOne(
+
+                {
+                    _id: order._id
+                },
+
+                {
+                    $set: {
+
+                        payment_status:"paid",
+
+                        payment_mode: payment.method,
+
+                        "payment.razorpay_payment_id":
+                            payment.id,
+
+                        "payment.method":
+                            payment.method,
+
+                        "payment.amount":
+                            payment.amount,
+
+                        "payment.currency":
+                            payment.currency,
+
+                        "payment.status":
+                            payment.status,
+
+                        "payment.captured":
+                            payment.captured,
+
+                        "payment.email":
+                            payment.email,
+
+                        "payment.contact":
+                            payment.contact,
+
+                        "payment.bank":
+                            payment.bank,
+
+                        "payment.wallet":
+                            payment.wallet,
+
+                        "payment.vpa":
+                            payment.vpa,
+
+                        "payment.fee":
+                            payment.fee,
+
+                        "payment.tax":
+                            payment.tax,
+
+                        "payment.acquirer_data":
+                            payment.acquirer_data
+
+                    }
+
+                }
+
+            );
+
+
+            console.log(
+                `Payment captured: ${order.order_id}`
+            );
+
+
+            break;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT FAILED
+        |--------------------------------------------------------------------------
+        */
+
+        case "payment.failed": {
+
+            const payment =
+                webhookData
+                    ?.payload
+                    ?.payment
+                    ?.entity;
+
+
+            if (!payment) {
+                break;
+            }
+
+
+            const razorpayOrderId =
+                payment.order_id;
+
+
+            const order =
+                await Order.findOne({
+                    "payment.razorpay_order_id":
+                        razorpayOrderId
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found:",
+                    razorpayOrderId
+                );
+
+                break;
+
+            }
+
+
+            await Order.updateOne(
+
+                {
+                    _id: order._id
+                },
+
+                {
+                    $set: {
+
+                        payment_status:
+                            "failed",
+
+                        "payment.razorpay_payment_id":
+                            payment.id,
+
+                        "payment.method":
+                            payment.method,
+
+                        "payment.amount":
+                            payment.amount,
+
+                        "payment.currency":
+                            payment.currency,
+
+                        "payment.status":
+                            payment.status,
+
+                        "payment.error_code":
+                            payment.error_code,
+
+                        "payment.error_description":
+                            payment.error_description,
+
+                        "payment.error_source":
+                            payment.error_source,
+
+                        "payment.error_step":
+                            payment.error_step,
+
+                        "payment.error_reason":
+                            payment.error_reason
+
+                    }
+
+                }
+
+            );
+
+
+            console.log(
+                `Payment failed: ${order.order_id}`
+            );
+
+
+            break;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | ORDER PAID
+        |--------------------------------------------------------------------------
+        */
+
+        case "order.paid": {
+
+            /*
+             * payment.captured already handles
+             * successful payment.
+             *
+             * So yahan duplicate processing
+             * nahi karna.
+             */
+
+            console.log(
+                "order.paid received"
+            );
+
+            break;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UNKNOWN EVENT
+        |--------------------------------------------------------------------------
+        */
+
+        default: {
+
+            console.log(
+                `Unhandled Razorpay event: ${event}`
+            );
+
+            break;
+        }
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 9. Always Return 200
+    |--------------------------------------------------------------------------
+    */
+
+    return res.status(200).json({
+
+        success: true,
+
+        message:
+            "Webhook processed successfully"
+
+    });
+
+});
 
 module.exports = {
     createOrderByUser,
-    getMyordersDetails
+    getMyordersDetails,
+    razorpayWebhooks
 }

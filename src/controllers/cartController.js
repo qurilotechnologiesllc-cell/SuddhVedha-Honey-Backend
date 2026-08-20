@@ -132,144 +132,146 @@ const addToCart = asyncHandler(async (req, res) => {
 
 const addToGiftBoxInCart = asyncHandler(async (req, res) => {
 
-    const userId = req.user.id;
+    const userId = req.user.id
+    const { giftBoxId, quantity, products } = req.body
 
-    const {
-        giftBoxId,
-        quantity,
-        products
-    } = req.body;
-
-    let totalWeight = 0;
-    let calculatedTotalAmount = 0;
-    let save = 0;
-
-    // -----------------------------
-    // Basic Validation
-    // -----------------------------
-
+    // ─── Validation ───────────────────────────────
     if (!giftBoxId) {
-        throw new BadRequestError("Gift Box and Gift Wrap is required.");
+        throw new BadRequestError('Gift Box is required')
     }
-
-    if (giftBoxId) {
-        const giftBox = await GiftBox.findById(giftBoxId);
-
-        if (!giftBox) {
-            throw new NotFoundError("Gift Box not found.");
-        }
-        calculatedTotalAmount += giftBox.price
-    }
-
 
     if (!products || !Array.isArray(products) || products.length === 0) {
-        throw new BadRequestError("Please select at least one honey.");
+        throw new BadRequestError('Please select at least one honey')
     }
 
-
-    const productIds = products.map(item => item.productId);
-
-    const variantDocuments = await ProductVariant.find({
-        product: { $in: productIds }
-    });
-
-    const variantMap = new Map();
-
-    variantDocuments.forEach(doc => {
-        variantMap.set(doc.product.toString(), doc);
-    });
-
-
-    for (const item of products) {
-
-        const { productId, selectedWeight } = item;
-
-        // Memory se Variant Document nikalo
-        const variantDocument = variantMap.get(productId.toString());
-
-        if (!variantDocument) {
-            throw new NotFoundError("Product variant not found.");
-        }
-
-        // Embedded variant find karo
-        const variant = variantDocument.variants.id(selectedWeight);
-
-        if (!variant) {
-            throw new BadRequestError("Selected variant is invalid.");
-        }
-
-        // Weight
-        const weight = parseInt(variant.weight);
-
-        totalWeight += weight;
-
-        // variant Price
-        calculatedTotalAmount += variant.price;
-
-        save += variant.you_save
-
+    // ─── GiftBox Fetch ────────────────────────────
+    const giftBox = await GiftBox.findById(giftBoxId)
+    if (!giftBox) {
+        throw new NotFoundError('Gift Box not found')
     }
 
+    let totalWeight = 0
+    let calculatedTotalAmount = giftBox.price  // Box ka price
+    let save = 0
 
-    // -----------------------------
-    // Find Gift Cart
-    // -----------------------------
+    // ─── Har Product ki Details Fetch karo ────────
+    const productDetails = await Promise.all(
+        products.map(async (item) => {
+            const { productId, selectedWeight } = item
 
-    let giftCart = await Giftcart.findOne({ userId });
+            // ── Product fetch karo ────────────────
+            const product = await Product.findById(productId)
+                .select('product_name brand product_type floral_source imageDocumentId variantDocumentId')
+                .lean()
 
-    const newGiftItem = {
+            if (!product) {
+                throw new NotFoundError(`Product not found: ${productId}`)
+            }
 
-        giftBoxId,
+            // ── Primary Image fetch karo ──────────
+            const imageDoc = await ProductImage.findById(
+                product.imageDocumentId
+            ).select('images').lean()
 
-        quantity,
+            const primaryImage = imageDoc?.images?.find(
+                img => img.is_primary === true
+            ) || imageDoc?.images?.[0] || null
 
-        products
+            // ── Variant fetch karo ────────────────
+            const variantDoc = await ProductVariant.findById(
+                product.variantDocumentId
+            ).select('variants').lean()
 
-    };
+            const variant = variantDoc?.variants?.find(
+                v => v._id.toString() === selectedWeight.toString()
+            )
+
+            if (!variant) {
+                throw new BadRequestError(`Variant not found: ${selectedWeight}`)
+            }
+
+            // ── Totals calculate karo ─────────────
+            totalWeight += parseInt(variant.weight)
+            calculatedTotalAmount += variant.price
+            save += variant.you_save
+
+            return {
+                productId: product._id,
+                product_name: product.product_name,
+                brand: product.brand,
+                product_type: product.product_type,
+                floral_source: product.floral_source,
+
+                // ── Image ─────────────────────────
+                image: primaryImage ? {
+                    image_url: primaryImage.image_url,
+                    public_id: primaryImage.public_id
+                } : null,
+
+                // ── Selected Variant ──────────────
+                variant: {
+                    variantId: variant._id,
+                    weight: variant.weight,
+                    unit: variant.unit,
+                    price: variant.price,
+                    mrp: variant.mrp,
+                    you_save: variant.you_save,
+                    discount_percentage: variant.discount_percentage,
+                    stock_status: variant.stock_status,
+                    available_stock: variant.available_stock
+                }
+            }
+        })
+    )
+
+    // ─── GiftCart mein Save karo ──────────────────
+    let giftCart = await Giftcart.findOne({ userId })
+
+    const newGiftItem = { giftBoxId, quantity, products }
 
     if (!giftCart) {
-
         giftCart = await Giftcart.create({
-
             userId,
-
             items: [newGiftItem]
-
-        });
-
+        })
     } else {
-
-        giftCart.items.push(newGiftItem);
-
-        await giftCart.save();
-
+        giftCart.items.push(newGiftItem)
+        await giftCart.save()
     }
 
-    return res.status(200).json({
+    // ─── Naya saved item ka ID lo ─────────────────
+    const savedItem = giftCart.items[giftCart.items.length - 1]
 
+    // ─── Response ─────────────────────────────────
+    res.status(200).json({
         success: true,
-
-        message: "Gift added to cart successfully.",
-
+        message: 'Gift added to cart successfully',
         data: {
-
-            giftBoxId,
-
+            giftCartId: giftCart._id,
+            giftItemId: savedItem._id,
             quantity,
 
-            products,
+            // ── GiftBox Info ──────────────────────
+            giftBox: {
+                giftBoxId: giftBox._id,
+                name: giftBox.name,
+                image: giftBox.image,
+                price: giftBox.price,
+                jar_count: giftBox.jar_count,
+                box_type: giftBox.box_type
+            },
 
-            totalWeight,
+            // ── Products with Details ─────────────
+            products: productDetails,
 
-            totalAmount: calculatedTotalAmount,
-
-            save
-
+            // ── Summary ───────────────────────────
+            totalWeight: totalWeight * quantity,
+            packingPrice: giftBox.price,
+            totalAmount: calculatedTotalAmount * quantity,
+            save: save * quantity
         }
-
-    });
-
-});
+    })
+})
 
 const getCart = asyncHandler(async (req, res) => {
 
@@ -282,7 +284,7 @@ const getCart = asyncHandler(async (req, res) => {
         giftBoxMap,
         offerMap
     } = await buildCartCatalog(userId);
-    
+
 
     const normalItems = buildNormalCart(
         cart,
