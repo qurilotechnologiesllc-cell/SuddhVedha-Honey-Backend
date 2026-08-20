@@ -24,13 +24,6 @@ const giftCartSchema = new Schema({
                 required: true
             },
 
-            // Coupon applied on this custom gift item
-            couponId: {
-                type: Schema.Types.ObjectId,
-                ref: "Coupon",
-                default: null
-            },
-
             products: [
 
                 {

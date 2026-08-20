@@ -29,13 +29,6 @@ const cartSchema = new Schema({
                 required: [true, 'Quantity is required'],
                 min: [1, 'Quantity cannot be less than 1'],
                 default: 1
-            },
-
-            // Coupon applied on this cart item
-            couponId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Coupon",
-                default: null
             }
         }
     ]

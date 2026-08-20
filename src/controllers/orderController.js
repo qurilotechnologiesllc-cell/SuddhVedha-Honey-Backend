@@ -1,48 +1,91 @@
 const Order = require('../models/orders.model');
+const Ordergroup = require('../models/orderGoup.model')
 const User = require('../models/user.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
 const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCart.service');
 const { updateStockAfterOrder } = require('../services/updateStockAfterOrder')
+const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
+
+const generateOrderGroupId = () => {
+
+    const date = new Date();
+
+    const yyyy =
+        date.getUTCFullYear();
+
+    const mm =
+        String(
+            date.getUTCMonth() + 1
+        ).padStart(2, "0");
+
+    const dd =
+        String(
+            date.getUTCDate()
+        ).padStart(2, "0");
+
+    const random =
+        crypto
+            .randomBytes(4)
+            .toString("hex")
+            .toUpperCase();
+
+    return `SG-${yyyy}${mm}${dd}-${random}`;
+};
+
 const generateOrderId = () => {
-
     const date = new Date()
-
     const yyyy = date.getUTCFullYear()
     const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
     const dd = String(date.getUTCDate()).padStart(2, '0')
+    const random = crypto.randomBytes(4).toString('hex').toUpperCase()
 
-    const random = crypto
-        .randomBytes(4)
-        .toString('hex')
-        .toUpperCase()
-
-    return `SV-${yyyy}${mm}${dd}-${random}`
+    return `SV - ${yyyy}${mm}${dd} -${random}`
 }
 
 const createOrderByUser = asyncHandler(async (req, res) => {
 
-    const { id } = req.user || {}
+    const { id } = req.user || {};
+
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Authenticate User
+    |--------------------------------------------------------------------------
+    */
 
     if (!id) {
         throw new UnauthorizedError(
-            'User authentication required'
-        )
+            "User authentication required"
+        );
     }
 
 
-    const user = await User.findById(id).select('_id')
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Find User
+    |--------------------------------------------------------------------------
+    */
+
+    const user =
+        await User.findById(id)
+            .select("_id");
 
     if (!user) {
         throw new NotFoundError(
-            'User not found'
-        )
+            "User not found"
+        );
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Request Data
+    |--------------------------------------------------------------------------
+    */
 
     const {
         items,
@@ -51,16 +94,23 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         billing_address,
         payment_mode,
         customer_note
-    } = req.body
+    } = req.body;
 
 
     /*
     |--------------------------------------------------------------------------
     | 4. Validate Items
     |--------------------------------------------------------------------------
+    |
+    | Single item:
+    | [NORMAL]
+    |
+    | Multiple:
+    | [NORMAL, CUSTOM]
+    |
     */
 
-    validateOrderItems(items)
+    validateOrderItems(items);
 
 
     /*
@@ -70,134 +120,479 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     */
 
     if (
-        typeof finalAmount !== 'number' ||
+        typeof finalAmount !== "number" ||
         !Number.isFinite(finalAmount) ||
         finalAmount < 0
     ) {
         throw new BadRequestError(
-            'Valid finalAmount is required'
-        )
+            "Valid finalAmount is required"
+        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | 6. Validate Shipping Address
+    | 6. Calculate Total From Items
+    |--------------------------------------------------------------------------
+    |
+    | Frontend finalAmount ko blindly trust nahi karna.
+    |
+    */
+
+    const calculatedAmount =
+        items.reduce(
+            (total, item) => {
+
+                return (
+                    total +
+                    Number(
+                        item.product_details.totalAmount
+                    )
+                );
+
+            },
+            0
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Verify Final Amount
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        Math.round(calculatedAmount * 100) !==
+        Math.round(finalAmount * 100)
+    ) {
+
+        throw new BadRequestError(
+            "Order amount mismatch"
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 8. Validate Shipping Address
     |--------------------------------------------------------------------------
     */
 
     if (
         !shipping_address ||
-        typeof shipping_address !== 'object' ||
+        typeof shipping_address !== "object" ||
         Array.isArray(shipping_address)
     ) {
         throw new BadRequestError(
-            'Shipping address is required'
-        )
+            "Shipping address is required"
+        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | 7. Validate Billing Address
+    | 9. Validate Billing Address
     |--------------------------------------------------------------------------
     */
 
     if (
         !billing_address ||
-        typeof billing_address !== 'object' ||
+        typeof billing_address !== "object" ||
         Array.isArray(billing_address)
     ) {
         throw new BadRequestError(
-            'Billing address is required'
-        )
+            "Billing address is required"
+        );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | 8. Validate Payment Mode
+    | 10. Validate Payment Mode
     |--------------------------------------------------------------------------
     */
 
     const allowedPaymentModes = [
-        'upi',
-        'card',
-        'net_banking',
-        'wallet',
-        'cod'
-    ]
+        "upi",
+        "card",
+        "net_banking",
+        "wallet",
+        "cod"
+    ];
+
 
     if (!payment_mode) {
         throw new BadRequestError(
-            'Payment mode is required'
-        )
+            "Payment mode is required"
+        );
     }
 
 
-    if (!allowedPaymentModes.includes(payment_mode)) {
+    if (
+        !allowedPaymentModes.includes(
+            payment_mode
+        )
+    ) {
         throw new BadRequestError(
             `Invalid payment mode: ${payment_mode}`
-        )
+        );
     }
-
 
 
     /*
     |--------------------------------------------------------------------------
-    | 11. Generate Order ID
+    | 11. Generate Group ID
     |--------------------------------------------------------------------------
     */
 
-    const order_id = generateOrderId()
+    const group_id =
+        generateOrderGroupId();
 
 
-    if (payment_mode === "cod") {
+    /*
+    |--------------------------------------------------------------------------
+    | 12. Create OrderGroup
+    |--------------------------------------------------------------------------
+    |
+    | Abhi group create hoga.
+    |
+    */
 
-        const order = await Order.create({
+    const orderGroup =
+        await Ordergroup.create({
 
-            order_id,
+            group_id,
 
             userId: user._id,
 
-            items,
+            orderIds: [],
 
-            finalAmount,
-
-            shipping_address,
-
-            billing_address,
+            finalAmount: finalAmount,
 
             payment_mode,
 
-            payment_status: "pending",
+            payment_status:
+                "pending",
 
-            payment: {},
-
-            order_status: "processing",
-
-            inventory_status: "reserved",
-
-            customer_note: customer_note || ""
+            payment: {}
 
         });
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | 13. COD
+    |--------------------------------------------------------------------------
+    */
+
+    if (payment_mode === "cod") {
+
+        const createdOrders = [];
+
+
         /*
         |--------------------------------------------------------------------------
-        | Remove Cart
+        | Create Individual Orders
+        |--------------------------------------------------------------------------
+        */
+
+        for (const item of items) {
+
+            const order =
+                await Order.create({
+
+                    order_group_id:
+                        orderGroup._id,
+
+                    order_id:
+                        generateOrderId(),
+
+                    userId:
+                        user._id,
+
+                    items: [item],
+
+                    totalAmount:
+                        item.product_details.totalAmount,
+
+                    shipping_address,
+
+                    billing_address,
+
+                    payment_mode,
+
+                    payment_status:
+                        "pending",
+
+                    payment: {},
+
+                    order_status:
+                        "processing",
+
+                    inventory_status:
+                        "reserved",
+
+                    customer_note:
+                        customer_note || ""
+
+                });
+
+
+            createdOrders.push(order);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Remove Item From Cart
+            |--------------------------------------------------------------------------
+            */
+
+            await removeOrderedItemsFromCart(
+                user._id,
+                [item]
+            );
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update / Reserve Stock
+            |--------------------------------------------------------------------------
+            */
+
+            await updateStockAfterOrder(
+                order.items
+            );
+
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Order IDs Into Group
+        |--------------------------------------------------------------------------
+        */
+
+        const orderIds =
+            createdOrders.map(
+                order => order._id
+            );
+
+
+        orderGroup.orderIds =
+            orderIds;
+
+
+        await orderGroup.save();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COD Response
+        |--------------------------------------------------------------------------
+        */
+
+        return res.status(201).json({
+
+            success: true,
+
+            message:
+                "COD order group created successfully",
+
+            payment_required:
+                false,
+
+            group: {
+
+                _id:
+                    orderGroup._id,
+
+                group_id:
+                    orderGroup.group_id,
+
+                finalAmount:
+                    orderGroup.finalAmount,
+
+                payment_mode:
+                    orderGroup.payment_mode,
+
+                payment_status:
+                    orderGroup.payment_status,
+
+                orderIds
+
+            },
+
+            orders:
+                createdOrders.map(
+                    order => ({
+
+                        _id:
+                            order._id,
+
+                        order_id:
+                            order.order_id,
+
+                        totalAmount:
+                            order.totalAmount,
+
+                        payment_status:
+                            order.payment_status,
+
+                        order_status:
+                            order.order_status
+
+                    })
+                )
+
+        });
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 14. Razorpay Amount
+    |--------------------------------------------------------------------------
+    */
+
+    const razorpayAmount =
+        Math.round(
+            finalAmount * 100
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 15. Create ONE Razorpay Order
+    |--------------------------------------------------------------------------
+    |
+    | Chahe 1 item ho ya 10 items,
+    | Razorpay par sirf ONE order.
+    |
+    */
+
+    const razorpayOrder =
+        await razorpay.orders.create({
+
+            amount:
+                razorpayAmount,
+
+            currency:
+                "INR",
+
+            receipt:
+                group_id,
+
+            notes: {
+
+                user_id:
+                    String(user._id),
+
+                order_group_id:
+                    String(orderGroup._id),
+
+                group_id
+
+            },
+
+            partial_payment:
+                false
+
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 16. Update OrderGroup With Razorpay Details
+    |--------------------------------------------------------------------------
+    */
+
+    orderGroup.payment = {
+
+        razorpay_order_id:
+            razorpayOrder.id
+
+    };
+
+
+    await orderGroup.save();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 17. Create Individual Orders
+    |--------------------------------------------------------------------------
+    */
+
+    const createdOrders = [];
+
+
+    for (const item of items) {
+
+        const order =
+            await Order.create({
+
+                order_group_id:
+                    orderGroup._id,
+
+                order_id:
+                    generateOrderId(),
+
+                userId:
+                    user._id,
+
+                items: [item],
+
+                totalAmount:
+                    item.product_details.totalAmount,
+
+                shipping_address,
+
+                billing_address,
+
+                payment_mode,
+
+                payment_status:
+                    "pending",
+
+                payment: {
+
+                    razorpay_order_id:
+                        razorpayOrder.id
+
+                },
+
+                order_status:
+                    "processing",
+
+                inventory_status:
+                    "reserved",
+
+                customer_note:
+                    customer_note || ""
+
+            });
+
+
+        createdOrders.push(order);
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Remove Item From Cart
         |--------------------------------------------------------------------------
         */
 
         await removeOrderedItemsFromCart(
             user._id,
-            items
+            [item]
         );
 
 
         /*
         |--------------------------------------------------------------------------
-        | Update Stock
+        | Update / Reserve Stock
         |--------------------------------------------------------------------------
         */
 
@@ -205,139 +600,27 @@ const createOrderByUser = asyncHandler(async (req, res) => {
             order.items
         );
 
-
-        return res.status(201).json({
-
-            success: true,
-
-            message: "COD order created successfully",
-
-            payment_required: false,
-
-            order: {
-
-                _id: order._id,
-
-                order_id: order.order_id,
-
-                finalAmount: order.finalAmount,
-
-                payment_mode: order.payment_mode,
-
-                payment_status:
-                    order.payment_status,
-
-                order_status:
-                    order.order_status
-
-            }
-
-        });
-
     }
 
-    const razorpayAmount =
-        Math.round(finalAmount * 100);
-
 
     /*
     |--------------------------------------------------------------------------
-    | 11. Create Razorpay Order
+    | 18. Add Order IDs To OrderGroup
     |--------------------------------------------------------------------------
     */
 
-    const razorpayOrder =
-        await razorpay.orders.create({
+    orderGroup.orderIds =
+        createdOrders.map(
+            order => order._id
+        );
 
-            amount: razorpayAmount,
 
-            currency: "INR",
-
-            receipt: order_id,
-
-            notes: {
-
-                user_id: String(user._id),
-
-                internal_order_id: order_id
-
-            },
-
-            partial_payment: false
-
-        });
+    await orderGroup.save();
 
 
     /*
     |--------------------------------------------------------------------------
-    | 12. Razorpay Order Created
-    |--------------------------------------------------------------------------
-    |
-    | Ab Razorpay order successfully create ho gaya.
-    |
-    */
-
-    /*
-    |--------------------------------------------------------------------------
-    | 12. Create Order
-    |--------------------------------------------------------------------------
-    */
-
-    const order = await Order.create({
-
-        order_id,
-
-        userId: user._id,
-
-        items,
-
-        finalAmount,
-
-        shipping_address,
-
-        billing_address,
-
-        payment_mode,
-
-        payment_status: "pending",
-
-        payment: {
-
-            razorpay_order_id:
-                razorpayOrder.id
-
-        },
-
-        order_status: "processing",
-
-        inventory_status: "reserved",
-
-        customer_note:
-            customer_note || ""
-
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | 13. Remove Ordered Items From Cart
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    |
-    | This happens AFTER order creation succeeds.
-    |
-    */
-
-    await removeOrderedItemsFromCart(
-        user._id,
-        items
-    )
-
-    // ✅ Order create hone ke baad stock update karo
-    await updateStockAfterOrder(order.items)
-    /*
-    |--------------------------------------------------------------------------
-    | 13. Response
+    | 19. Response
     |--------------------------------------------------------------------------
     */
 
@@ -346,50 +629,63 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         success: true,
 
         message:
-            "Razorpay order and database order created successfully",
+            "Order group and Razorpay order created successfully",
 
-        payment_required: true,
+        payment_required:
+            true,
 
-        order: {
+        group: {
 
-            _id: order._id,
+            _id:
+                orderGroup._id,
 
-            order_id: order.order_id,
-
-            razorpay_order_id:
-                razorpayOrder.id,
-
-            amount:
-                razorpayOrder.amount,
-
-            currency:
-                razorpayOrder.currency,
-
-            receipt:
-                razorpayOrder.receipt,
+            group_id:
+                orderGroup.group_id,
 
             finalAmount:
-                order.finalAmount,
+                orderGroup.finalAmount,
 
             payment_mode:
-                order.payment_mode,
+                orderGroup.payment_mode,
 
             payment_status:
-                order.payment_status,
+                orderGroup.payment_status,
+
+            orderIds:
+                orderGroup.orderIds,
 
             payment:
-                order.payment,
-
-            order_status:
-                order.order_status,
-
-            inventory_status:
-                order.inventory_status,
-
-            createdAt:
-                order.createdAt
+                orderGroup.payment
 
         },
+
+        orders:
+            createdOrders.map(
+                order => ({
+
+                    _id:
+                        order._id,
+
+                    order_id:
+                        order.order_id,
+
+                    totalAmount:
+                        order.totalAmount,
+
+                    payment_mode:
+                        order.payment_mode,
+
+                    payment_status:
+                        order.payment_status,
+
+                    order_status:
+                        order.order_status,
+
+                    inventory_status:
+                        order.inventory_status
+
+                })
+            ),
 
         razorpay: {
 
@@ -408,7 +704,8 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         }
 
     });
-})
+
+});
 
 const getMyordersDetails = asyncHandler(async (req, res) => {
     const { id } = req.user
@@ -494,7 +791,14 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
 
 const razorpayWebhooks = asyncHandler(async (req, res) => {
 
-    const webhookSignature = req.headers["x-razorpay-signature"];
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Get Webhook Signature
+    |--------------------------------------------------------------------------
+    */
+
+    const webhookSignature =
+        req.headers["x-razorpay-signature"];
 
 
     if (!webhookSignature) {
@@ -503,7 +807,8 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
             success: false,
 
-            message: "Razorpay webhook signature missing"
+            message:
+                "Razorpay webhook signature missing"
 
         });
 
@@ -551,7 +856,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     /*
     |--------------------------------------------------------------------------
-    | 4. Compare Signature
+    | 4. Verify Signature
     |--------------------------------------------------------------------------
     */
 
@@ -580,29 +885,34 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     /*
     |--------------------------------------------------------------------------
-    | 5. Parse Body AFTER Signature Verification
+    | 5. Parse Body
     |--------------------------------------------------------------------------
     */
 
-    const webhookData = JSON.parse(rawBody.toString("utf8"));
+    const webhookData =
+        JSON.parse(
+            rawBody.toString("utf8")
+        );
 
 
     /*
     |--------------------------------------------------------------------------
-    | 6. Get Event
+    | 6. Event
     |--------------------------------------------------------------------------
     */
 
-    const event = webhookData.event;
+    const event =
+        webhookData.event;
 
 
     /*
     |--------------------------------------------------------------------------
-    | 7. Razorpay Event ID
+    | 7. Event ID
     |--------------------------------------------------------------------------
     */
 
-    const eventId = req.headers["x-razorpay-event-id"];
+    const eventId =
+        req.headers["x-razorpay-event-id"];
 
 
     console.log(
@@ -618,22 +928,20 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     /*
     |--------------------------------------------------------------------------
-    | 8. Handle Events
+    | 8. PAYMENT AUTHORIZED
     |--------------------------------------------------------------------------
     */
 
     switch (event) {
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | PAYMENT AUTHORIZED
-        |--------------------------------------------------------------------------
-        */
-
         case "payment.authorized": {
 
-            const payment = webhookData?.payload?.payment?.entity;
+            const payment =
+                webhookData
+                    ?.payload
+                    ?.payment
+                    ?.entity;
 
 
             if (!payment) {
@@ -641,20 +949,29 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            const razorpayOrderId = payment.order_id;
+            /*
+            |--------------------------------------------------------------------------
+            | Find OrderGroup
+            |--------------------------------------------------------------------------
+            */
+
+            const razorpayOrderId =
+                payment.order_id;
 
 
-            const order =
-                await Order.findOne({
+            const orderGroup =
+                await OrderGroup.findOne({
+
                     "payment.razorpay_order_id":
                         razorpayOrderId
+
                 });
 
 
-            if (!order) {
+            if (!orderGroup) {
 
                 console.error(
-                    "Order not found:",
+                    "OrderGroup not found:",
                     razorpayOrderId
                 );
 
@@ -663,38 +980,51 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            await Order.updateOne(
+            /*
+            |--------------------------------------------------------------------------
+            | Update Group + All Orders
+            |--------------------------------------------------------------------------
+            */
 
-                {
-                    _id: order._id
-                },
+            await updateOrderGroupAndOrders({
 
-                {
-                    $set: {
+                orderGroup,
 
-                        payment_status:
-                            "processing",
+                orderStatus:
+                    "processing",
 
-                        "payment.razorpay_payment_id":
-                            payment.id,
+                paymentStatus:
+                    "processing",
 
-                        "payment.method":
-                            payment.method,
+                paymentData: {
 
-                        "payment.amount":
-                            payment.amount,
+                    razorpay_order_id:
+                        razorpayOrderId,
 
-                        "payment.currency":
-                            payment.currency,
+                    razorpay_payment_id:
+                        payment.id,
 
-                        "payment.status":
-                            payment.status
+                    method:
+                        payment.method,
 
-                    }
+                    amount:
+                        payment.amount,
+
+                    currency:
+                        payment.currency,
+
+                    status:
+                        payment.status
 
                 }
 
+            });
+
+
+            console.log(
+                `Payment authorized: ${orderGroup.group_id}`
             );
+
 
             break;
         }
@@ -708,7 +1038,11 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
         case "payment.captured": {
 
-            const payment = webhookData?.payload?.payment?.entity;
+            const payment =
+                webhookData
+                    ?.payload
+                    ?.payment
+                    ?.entity;
 
 
             if (!payment) {
@@ -716,16 +1050,29 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            const razorpayOrderId = payment.order_id;
+            /*
+            |--------------------------------------------------------------------------
+            | Find OrderGroup
+            |--------------------------------------------------------------------------
+            */
+
+            const razorpayOrderId =
+                payment.order_id;
 
 
-            const order = await Order.findOne({ "payment.razorpay_order_id": razorpayOrderId});
+            const orderGroup =
+                await OrderGroup.findOne({
+
+                    "payment.razorpay_order_id":
+                        razorpayOrderId
+
+                });
 
 
-            if (!order) {
+            if (!orderGroup) {
 
                 console.error(
-                    "Order not found:",
+                    "OrderGroup not found:",
                     razorpayOrderId
                 );
 
@@ -736,25 +1083,34 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
             /*
             |--------------------------------------------------------------------------
-            | Amount Validation
+            | Validate Total Payment
             |--------------------------------------------------------------------------
             */
 
-            const expectedAmount = Math.round(order.finalAmount * 100);
+            const expectedAmount =
+                Math.round(
+                    orderGroup.totalAmount * 100
+                );
 
 
-            if ( payment.amount !== expectedAmount) {
+            if (
+                payment.amount !==
+                expectedAmount
+            ) {
 
-                console.error("Payment amount mismatch",
+                console.error(
+                    "Payment amount mismatch",
                     {
-                        orderId:
-                            order.order_id,
+
+                        group_id:
+                            orderGroup.group_id,
 
                         expected:
                             expectedAmount,
 
                         received:
                             payment.amount
+
                     }
                 );
 
@@ -765,74 +1121,74 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
             /*
             |--------------------------------------------------------------------------
-            | Update Payment
+            | Update Group + All Orders
             |--------------------------------------------------------------------------
             */
 
-            await Order.updateOne(
+            await updateOrderGroupAndOrders({
 
-                {
-                    _id: order._id
-                },
+                orderGroup,
 
-                {
-                    $set: {
+                orderStatus:
+                    "processing",
 
-                        payment_status:"paid",
+                paymentStatus:
+                    "paid",
 
-                        payment_mode: payment.method,
+                paymentData: {
 
-                        "payment.razorpay_payment_id":
-                            payment.id,
+                    razorpay_order_id:
+                        razorpayOrderId,
 
-                        "payment.method":
-                            payment.method,
+                    razorpay_payment_id:
+                        payment.id,
 
-                        "payment.amount":
-                            payment.amount,
+                    method:
+                        payment.method,
 
-                        "payment.currency":
-                            payment.currency,
+                    amount:
+                        payment.amount,
 
-                        "payment.status":
-                            payment.status,
+                    currency:
+                        payment.currency,
 
-                        "payment.captured":
-                            payment.captured,
+                    status:
+                        payment.status,
 
-                        "payment.email":
-                            payment.email,
+                    captured:
+                        payment.captured,
 
-                        "payment.contact":
-                            payment.contact,
+                    email:
+                        payment.email,
 
-                        "payment.bank":
-                            payment.bank,
+                    contact:
+                        payment.contact,
 
-                        "payment.wallet":
-                            payment.wallet,
+                    bank:
+                        payment.bank,
 
-                        "payment.vpa":
-                            payment.vpa,
+                    wallet:
+                        payment.wallet,
 
-                        "payment.fee":
-                            payment.fee,
+                    vpa:
+                        payment.vpa,
 
-                        "payment.tax":
-                            payment.tax,
+                    fee:
+                        payment.fee,
 
-                        "payment.acquirer_data":
-                            payment.acquirer_data
+                    tax:
+                        payment.tax,
 
-                    }
+                    acquirer_data:
+                        payment.acquirer_data
 
                 }
 
-            );
+            });
 
 
             console.log(
-                `Payment captured: ${order.order_id}`
+                `Payment captured: ${orderGroup.group_id}`
             );
 
 
@@ -860,21 +1216,29 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
+            /*
+            |--------------------------------------------------------------------------
+            | Find OrderGroup
+            |--------------------------------------------------------------------------
+            */
+
             const razorpayOrderId =
                 payment.order_id;
 
 
-            const order =
-                await Order.findOne({
+            const orderGroup =
+                await OrderGroup.findOne({
+
                     "payment.razorpay_order_id":
                         razorpayOrderId
+
                 });
 
 
-            if (!order) {
+            if (!orderGroup) {
 
                 console.error(
-                    "Order not found:",
+                    "OrderGroup not found:",
                     razorpayOrderId
                 );
 
@@ -883,57 +1247,64 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            await Order.updateOne(
+            /*
+            |--------------------------------------------------------------------------
+            | Update Group + All Orders
+            |--------------------------------------------------------------------------
+            */
 
-                {
-                    _id: order._id
-                },
+            await updateOrderGroupAndOrders({
 
-                {
-                    $set: {
+                orderGroup,
 
-                        payment_status:
-                            "failed",
+                orderStatus:
+                    "processing",
 
-                        "payment.razorpay_payment_id":
-                            payment.id,
+                paymentStatus:
+                    "failed",
 
-                        "payment.method":
-                            payment.method,
+                paymentData: {
 
-                        "payment.amount":
-                            payment.amount,
+                    razorpay_order_id:
+                        razorpayOrderId,
 
-                        "payment.currency":
-                            payment.currency,
+                    razorpay_payment_id:
+                        payment.id,
 
-                        "payment.status":
-                            payment.status,
+                    method:
+                        payment.method,
 
-                        "payment.error_code":
-                            payment.error_code,
+                    amount:
+                        payment.amount,
 
-                        "payment.error_description":
-                            payment.error_description,
+                    currency:
+                        payment.currency,
 
-                        "payment.error_source":
-                            payment.error_source,
+                    status:
+                        payment.status,
 
-                        "payment.error_step":
-                            payment.error_step,
+                    error_code:
+                        payment.error_code,
 
-                        "payment.error_reason":
-                            payment.error_reason
+                    error_description:
+                        payment.error_description,
 
-                    }
+                    error_source:
+                        payment.error_source,
+
+                    error_step:
+                        payment.error_step,
+
+                    error_reason:
+                        payment.error_reason
 
                 }
 
-            );
+            });
 
 
             console.log(
-                `Payment failed: ${order.order_id}`
+                `Payment failed: ${orderGroup.group_id}`
             );
 
 
@@ -949,17 +1320,134 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
         case "order.paid": {
 
+            const razorpayOrder =
+                webhookData
+                    ?.payload
+                    ?.order
+                    ?.entity;
+
+
+            if (!razorpayOrder) {
+                break;
+            }
+
+
             /*
-             * payment.captured already handles
-             * successful payment.
-             *
-             * So yahan duplicate processing
-             * nahi karna.
-             */
+            |--------------------------------------------------------------------------
+            | Find OrderGroup
+            |--------------------------------------------------------------------------
+            */
+
+            const razorpayOrderId =
+                razorpayOrder.id;
+
+
+            const orderGroup =
+                await OrderGroup.findOne({
+
+                    "payment.razorpay_order_id":
+                        razorpayOrderId
+
+                });
+
+
+            if (!orderGroup) {
+
+                console.error(
+                    "OrderGroup not found:",
+                    razorpayOrderId
+                );
+
+                break;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Amount Validation
+            |--------------------------------------------------------------------------
+            */
+
+            const expectedAmount =
+                Math.round(
+                    orderGroup.totalAmount * 100
+                );
+
+
+            if (
+                razorpayOrder.amount !==
+                expectedAmount
+            ) {
+
+                console.error(
+                    "Order paid amount mismatch",
+                    {
+
+                        group_id:
+                            orderGroup.group_id,
+
+                        expected:
+                            expectedAmount,
+
+                        received:
+                            razorpayOrder.amount
+
+                    }
+                );
+
+                break;
+
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Group + All Orders
+            |--------------------------------------------------------------------------
+            |
+            | order.paid payload mein payment entity
+            | ke saare details necessarily nahi milte.
+            |
+            | Isliye jo payment details pehle
+            | payment.captured mein save ho chuki hain,
+            | unhe preserve karenge.
+            |
+            */
+
+            await updateOrderGroupAndOrders({
+
+                orderGroup,
+
+                orderStatus:
+                    "processing",
+
+                paymentStatus:
+                    "paid",
+
+                paymentData: {
+
+                    razorpay_order_id:
+                        razorpayOrderId,
+
+                    amount:
+                        razorpayOrder.amount,
+
+                    currency:
+                        razorpayOrder.currency,
+
+                    status:
+                        "paid"
+
+                }
+
+            });
+
 
             console.log(
-                "order.paid received"
+                `Order paid: ${orderGroup.group_id}`
             );
+
 
             break;
         }
@@ -978,16 +1466,11 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             );
 
             break;
+
         }
 
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 9. Always Return 200
-    |--------------------------------------------------------------------------
-    */
 
     return res.status(200).json({
 

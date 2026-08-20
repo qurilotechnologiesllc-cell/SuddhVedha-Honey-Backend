@@ -68,6 +68,12 @@ const orderSchema = new mongoose.Schema({
         index: true
     },
 
+    order_group_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "OrderGroup",
+        required: true
+    },
+
 
     // ─────────────────────────────────────────
     // Order Items
@@ -83,7 +89,7 @@ const orderSchema = new mongoose.Schema({
     // Final Amount
     // ─────────────────────────────────────────
 
-    finalAmount: {
+    totalAmount: {
         type: Number,
         required: true
     },

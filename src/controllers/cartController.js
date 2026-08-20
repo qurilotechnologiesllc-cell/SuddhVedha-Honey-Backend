@@ -281,20 +281,17 @@ const getCart = asyncHandler(async (req, res) => {
         cart,
         giftCart,
         catalogMap,
-        giftBoxMap,
-        offerMap
+        giftBoxMap
     } = await buildCartCatalog(userId);
 
 
     const normalItems = buildNormalCart(
         cart,
-        offerMap,
         catalogMap
     );
 
     const giftItems = buildGiftCart(
         giftCart,
-        offerMap,
         catalogMap,
         giftBoxMap
     );
