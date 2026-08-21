@@ -119,8 +119,9 @@ const orderSchema = new mongoose.Schema({
         enum: [
             'upi',
             'card',
-            'net_banking',
+            'netbanking',
             'wallet',
+            'emi',
             'cod'
         ],
         required: true
@@ -135,12 +136,13 @@ const orderSchema = new mongoose.Schema({
         type: String,
         enum: [
             'pending',
-            'processing',
-            'paid',
+            'created',
+            'authorized',
+            'captured',
             'failed',
-            'cancelled',
             'refunded',
-            'partially_refunded'
+            'partially_refunded',
+            'cancelled'
         ],
         default: 'pending',
         index: true

@@ -133,207 +133,263 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     }
 
 
+  const calculatedAmount =
+    items.reduce(
+        (total, item) => {
+
+            return (
+                total +
+                Number(
+                    item.product_details.totalAmount
+                )
+            );
+
+        },
+        0
+    );
+
+
+let couponDiscount = 0;
+let appliedCoupon = null;
+let couponUsage = null;
+
+
+/*
+|--------------------------------------------------------------------------
+| 7. Coupon Validation & Discount Calculation
+|--------------------------------------------------------------------------
+|
+| Coupon agar hai to pehle coupon discount calculate hoga.
+|
+*/
+
+if (couponCode) {
+
+    const normalizedCouponCode =
+        couponCode
+            .trim()
+            .toUpperCase();
+
+
     /*
     |--------------------------------------------------------------------------
-    | 6. Calculate Total From Items
+    | Find Offer
     |--------------------------------------------------------------------------
-    |
-    | Frontend finalAmount ko blindly trust nahi karna.
-    |
     */
 
-    
+    const offer =
+        await Offers.findOne({
 
-    const calculatedAmount =
-        items.reduce(
-            (total, item) => {
+            couponCode:
+                normalizedCouponCode,
 
-                return (
-                    total +
-                    Number(
-                        item.product_details.totalAmount
-                    )
-                );
+            isActive:
+                true
 
-            },
-            0
+        });
+
+
+    if (!offer) {
+
+        throw new BadRequestError(
+            "Invalid or inactive coupon code"
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Check User Coupon Usage
+    |--------------------------------------------------------------------------
+    */
+
+    couponUsage =
+        await CouponUsage.findOne({
+
+            userId:
+                user._id,
+
+            offerId:
+                offer._id,
+
+            isApplied:
+                true,
+
+            isAvailable:
+                true
+
+        });
+
+
+    if (!couponUsage) {
+
+        throw new BadRequestError(
+            "Coupon has not been applied"
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate Coupon Discount
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        offer.discountType ===
+        "PERCENTAGE"
+    ) {
+
+        couponDiscount =
+            (
+                calculatedAmount *
+                offer.discountValue
+            ) / 100;
+
+    }
+
+    else if (
+        offer.discountType ===
+        "FLAT"
+    ) {
+
+        couponDiscount =
+            offer.discountValue;
+
+    }
+
+    else {
+
+        throw new BadRequestError(
+            "Invalid coupon discount type"
+        );
+
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent Negative Amount
+    |--------------------------------------------------------------------------
+    */
+
+    couponDiscount =
+        Math.min(
+            couponDiscount,
+            calculatedAmount
         );
 
 
-    let couponDiscount = 0;
-    let appliedCoupon = null;
-    let couponUsage = null;
-
     /*
     |--------------------------------------------------------------------------
-    | 7. Verify Final Amount
+    | Round Coupon Discount
     |--------------------------------------------------------------------------
     */
+
+    couponDiscount =
+        Math.round(
+            couponDiscount * 100
+        ) / 100;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| 8. Calculate Amount After Coupon
+|--------------------------------------------------------------------------
+|
+| Coupon hai:
+|
+| calculatedAmount - couponDiscount
+|
+| Coupon nahi hai:
+|
+| calculatedAmount
+|
+*/
+
+const amountAfterCoupon =
+    Math.round(
+        (
+            calculatedAmount -
+            couponDiscount
+        ) * 100
+    ) / 100;
+
+
+/*
+|--------------------------------------------------------------------------
+| 9. Add COD Charge
+|--------------------------------------------------------------------------
+|
+| COD → 25% extra
+|
+| Online → No extra charge
+|
+*/
+
+let codCharge = 0;
+
+let expectedFinalAmount =
+    amountAfterCoupon;
+
+
+if (payment_mode === "cod") {
+
+    codCharge =
+        Math.round(
+            amountAfterCoupon * 0.25 * 100
+        ) / 100;
+
+
+    expectedFinalAmount =
+        Math.round(
+            (
+                amountAfterCoupon +
+                codCharge
+            ) * 100
+        ) / 100;
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| 10. Validate Frontend Final Amount
+|--------------------------------------------------------------------------
+*/
+
+if (
+    Math.round(finalAmount * 100) !==
+    Math.round(expectedFinalAmount * 100)
+) {
+
+    throw new BadRequestError(
+
+        `Final amount mismatch. Expected: ${expectedFinalAmount}, Received: ${finalAmount}`
+
+    );
+
+}
+
     if (couponCode) {
-
-        const normalizedCouponCode =
-            couponCode
-                .trim()
-                .toUpperCase();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Find Offer
-        |--------------------------------------------------------------------------
-        */
 
         const offer =
             await Offers.findOne({
 
                 couponCode:
-                    normalizedCouponCode,
+                    couponCode
+                        .trim()
+                        .toUpperCase(),
 
                 isActive:
                     true
 
             });
 
-
-        if (!offer) {
-            throw new BadRequestError(
-                "Invalid or inactive coupon code"
-            );
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Check User Coupon Usage
-        |--------------------------------------------------------------------------
-        */
-
-        couponUsage =
-            await CouponUsage.findOne({
-
-                userId:
-                    user._id,
-
-                offerId:
-                    offer._id,
-
-                isApplied:
-                    true,
-
-                isAvailable:
-                    true
-
-            });
-
-
-        if (!couponUsage) {
-
-            throw new BadRequestError(
-                "Coupon has not been applied"
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Calculate Discount
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            offer.discountType ===
-            "PERCENTAGE"
-        ) {
-
-            couponDiscount =
-                (
-                    calculatedAmount *
-                    offer.discountValue
-                ) / 100;
-
-        }
-        else if (
-            offer.discountType ===
-            "FLAT"
-        ) {
-
-            couponDiscount =
-                offer.discountValue;
-
-        }
-        else {
-
-            throw new BadRequestError(
-                "Invalid coupon discount type"
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent Negative Amount
-        |--------------------------------------------------------------------------
-        */
-
-        couponDiscount =
-            Math.min(
-                couponDiscount,
-                calculatedAmount
-            );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Round Amount
-        |--------------------------------------------------------------------------
-        */
-
-        couponDiscount =
-            Math.round(
-                couponDiscount * 100
-            ) / 100;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Final Amount
-        |--------------------------------------------------------------------------
-        */
-
-        const expectedFinalAmount =
-            Math.round(
-                (
-                    calculatedAmount -
-                    couponDiscount
-                ) * 100
-            ) / 100;
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Frontend Amount
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            Math.round(finalAmount * 100) !==
-            Math.round(expectedFinalAmount * 100)
-        ) {
-
-            throw new BadRequestError(
-                `Final amount mismatch. Expected: ${expectedFinalAmount}, Received: ${finalAmount}`
-            );
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Prepare Coupon Snapshot
-        |--------------------------------------------------------------------------
-        */
 
         appliedCoupon = {
 
@@ -354,27 +410,9 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         };
 
-    } else {
-
-        /*
-        |--------------------------------------------------------------------------
-        | No Coupon
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            Math.round(finalAmount * 100) !==
-            Math.round(calculatedAmount * 100)
-        ) {
-
-            throw new BadRequestError(
-                `Final amount mismatch. Expected: ${calculatedAmount}, Received: ${finalAmount}`
-            );
-
-        }
-
     }
-   
+
+
 
 
     /*
@@ -450,8 +488,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const group_id =
-        generateOrderGroupId();
+    const group_id = generateOrderGroupId();
 
 
     /*
@@ -463,14 +500,15 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     |
     */
 
-    const orderGroup =
-        await Ordergroup.create({
+    const orderGroup = await Ordergroup.create({
 
             group_id,
 
             userId: user._id,
 
             orderIds: [],
+
+            cod_amount: codCharge,
 
             totalAmount: calculatedAmount,
 
@@ -1027,59 +1065,42 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
 
 const razorpayWebhooks = asyncHandler(async (req, res) => {
 
-    /*
-    |--------------------------------------------------------------------------
-    | 1. Get Webhook Signature
-    |--------------------------------------------------------------------------
-    */
-
-    const webhookSignature =
-        req.headers["x-razorpay-signature"];
-
+    const webhookSignature = req.headers["x-razorpay-signature"];
 
     if (!webhookSignature) {
-
         return res.status(400).json({
-
             success: false,
-
-            message:
-                "Razorpay webhook signature missing"
-
+            message: "Razorpay webhook signature missing"
         });
-
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 2. Raw Webhook Body
-    |--------------------------------------------------------------------------
-    */
-
-    const rawBody = req.body;
+    // IMPORTANT:
+    // Original raw request body
+    const rawBody = req.rawBody;
 
 
-    if (!Buffer.isBuffer(rawBody)) {
+    console.log(
+        "Is Buffer:",
+        Buffer.isBuffer(rawBody)
+    );
 
+
+    console.log(
+        "Raw Webhook Body:",
+        rawBody
+    );
+
+
+    if (!rawBody) {
         return res.status(400).json({
-
             success: false,
-
-            message:
-                "Invalid webhook body"
-
+            message: "Raw webhook body not available"
         });
-
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 3. Generate Expected Signature
-    |--------------------------------------------------------------------------
-    */
-
+    // Signature verification
     const expectedSignature =
         crypto
             .createHmac(
@@ -1089,12 +1110,6 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             .update(rawBody)
             .digest("hex");
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | 4. Verify Signature
-    |--------------------------------------------------------------------------
-    */
 
     const isValidSignature =
         expectedSignature.length ===
@@ -1107,60 +1122,47 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     if (!isValidSignature) {
 
+        console.error(
+            "❌ Invalid Razorpay webhook signature"
+        );
+
         return res.status(400).json({
-
             success: false,
-
-            message:
-                "Invalid Razorpay webhook signature"
-
+            message: "Invalid Razorpay webhook signature"
         });
 
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 5. Parse Body
-    |--------------------------------------------------------------------------
-    */
+    console.log(
+        "✅ Razorpay signature verified"
+    );
 
+
+    // Parse ONLY after signature verification
     const webhookData =
         JSON.parse(
             rawBody.toString("utf8")
         );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 6. Event
-    |--------------------------------------------------------------------------
-    */
+    console.log(
+        "Webhook Data:",
+        webhookData
+    );
+
 
     const event =
         webhookData.event;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | 7. Event ID
-    |--------------------------------------------------------------------------
-    */
-
-    const eventId =
-        req.headers["x-razorpay-event-id"];
-
-
     console.log(
-        "Razorpay Webhook:",
+        "Razorpay Event data:",
         event
     );
 
-    console.log(
-        "Razorpay Event ID:",
-        eventId
-    );
 
+    console.log(webhookData?.payload?.payment?.entity)
 
     /*
     |--------------------------------------------------------------------------
@@ -1191,12 +1193,11 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |--------------------------------------------------------------------------
             */
 
-            const razorpayOrderId =
-                payment.order_id;
+            const razorpayOrderId = payment.order_id;
 
 
             const orderGroup =
-                await OrderGroup.findOne({
+                await Ordergroup.findOne({
 
                     "payment.razorpay_order_id":
                         razorpayOrderId
@@ -1229,8 +1230,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 orderStatus:
                     "processing",
 
-                paymentStatus:
-                    "processing",
+                paymentStatus: payment.status,
 
                 paymentData: {
 
@@ -1297,7 +1297,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
 
             const orderGroup =
-                await OrderGroup.findOne({
+                await Ordergroup.findOne({
 
                     "payment.razorpay_order_id":
                         razorpayOrderId
@@ -1368,8 +1368,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 orderStatus:
                     "processing",
 
-                paymentStatus:
-                    "paid",
+                paymentStatus: payment.status,
 
                 paymentData: {
 
@@ -1463,7 +1462,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
 
             const orderGroup =
-                await OrderGroup.findOne({
+                await Ordergroup.findOne({
 
                     "payment.razorpay_order_id":
                         razorpayOrderId
@@ -1496,8 +1495,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 orderStatus:
                     "processing",
 
-                paymentStatus:
-                    "failed",
+                paymentStatus: payment.status,
 
                 paymentData: {
 
@@ -1579,7 +1577,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
 
             const orderGroup =
-                await OrderGroup.findOne({
+                await Ordergroup.findOne({
 
                     "payment.razorpay_order_id":
                         razorpayOrderId
@@ -1658,8 +1656,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 orderStatus:
                     "processing",
 
-                paymentStatus:
-                    "paid",
+                paymentStatus: razorpayOrder.status,
 
                 paymentData: {
 

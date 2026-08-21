@@ -29,6 +29,11 @@ const orderGroupSchema = new mongoose.Schema({
         required: true
     },
 
+    cod_amount: {
+        type: Number,
+        default: 0
+    },
+
     coupon: {
 
         offerId: {
@@ -68,11 +73,12 @@ const orderGroupSchema = new mongoose.Schema({
     payment_mode: {
         type: String,
         enum: [
-            "upi",
-            "card",
-            "net_banking",
-            "wallet",
-            "cod"
+            'upi',
+            'card',
+            'netbanking',
+            'wallet',
+            'emi',
+            'cod'
         ],
         required: true
     },
@@ -80,15 +86,17 @@ const orderGroupSchema = new mongoose.Schema({
     payment_status: {
         type: String,
         enum: [
-            "pending",
-            "processing",
-            "paid",
-            "failed",
-            "cancelled",
-            "refunded",
-            "partially_refunded"
+            'pending',
+            'created',
+            'authorized',
+            'captured',
+            'failed',
+            'refunded',
+            'partially_refunded',
+            'cancelled'
         ],
-        default: "pending"
+        default: 'pending',
+        index: true
     },
 
     payment: {

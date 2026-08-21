@@ -11,8 +11,8 @@ const updateOrderGroupAndOrders = async ({
     |--------------------------------------------------------------------------
     */
 
-    orderGroup.payment_status =
-        paymentStatus;
+    orderGroup.payment_status = paymentStatus;
+    orderGroup.payment_status = paymentStatus;
 
     orderGroup.payment = {
         ...orderGroup.payment,
@@ -41,13 +41,11 @@ const updateOrderGroupAndOrders = async ({
         {
             $set: {
 
-                payment_status:
-                    paymentStatus,
+                payment_status: paymentStatus,
 
-                ...(orderStatus && {
-                    order_status:
-                        orderStatus
-                }),
+                payment_mode: paymentData.method,
+
+                ...(orderStatus && { order_status: orderStatus }),
 
                 ...(paymentData.razorpay_order_id && {
                     "payment.razorpay_order_id":

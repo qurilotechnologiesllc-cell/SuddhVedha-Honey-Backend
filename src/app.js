@@ -32,8 +32,19 @@ const productDashboardRoutes = require('./routes/productDashboardRoute');
 const notificationRoutes = require('./routes/notificationRoute');
 const SubscripationsPlans = require('./routes/plansRoute.js')
 
-// Middleware to parse JSON requests
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    }
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: true
+  })
+);
 
 // Secret key — signed cookies ke liye
 app.use(cookieParser(process.env.COOKIE_SECRET));
@@ -44,6 +55,8 @@ app.use(cors({
     "http://localhost:3050",
 
     "http://localhost:3051",
+
+    "https://sltwdpp8-3000.inc1.devtunnels.ms",
 
     "https://frontend-3050.devtunnels.ms",
 
