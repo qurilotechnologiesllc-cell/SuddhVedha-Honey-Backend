@@ -96,8 +96,12 @@ const getWishlist = asyncHandler(async (req, res) => {
             ]
         })
 
-    if (!wishlist) {
-        throw new NotFoundError('Wishlist not found')
+   if (!wishlist) {
+        return res.status(200).json({
+            success: true,
+            message: 'Wishlist is empty',
+            data: []
+        })
     }
 
     res.status(200).json({
