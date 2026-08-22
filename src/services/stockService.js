@@ -186,8 +186,7 @@ const deductStock = async (
     // 6. Check Stock After Order
     // ─────────────────────────────────────────
 
-    const remainingStock =
-        variant.available_stock - quantity;
+    const remainingStock = variant.available_stock - quantity;
 
 
     if (
@@ -206,8 +205,7 @@ const deductStock = async (
     // 7. Deduct Stock
     // ─────────────────────────────────────────
 
-    variant.available_stock =
-        remainingStock;
+    variant.available_stock = remainingStock;
 
 
     // ─────────────────────────────────────────
@@ -270,4 +268,158 @@ const deductStock = async (
 
 };
 
-module.exports = { updateStockAfterOrder }
+const checkStockBeforeOrder = async (items) => {
+
+    for (const item of items) {
+
+        // ─────────────────────────────
+        // NORMAL
+        // ─────────────────────────────
+
+        if (item.type === "NORMAL") {
+
+            const productId =
+                item.product_details?.product?._id;
+
+            const variantId =
+                item.product_details?.product?.variant?._id;
+
+            const quantity =
+                item.reserved_quantity || 1;
+
+            await checkVariantStock(
+                productId,
+                variantId,
+                quantity
+            );
+        }
+
+
+        // ─────────────────────────────
+        // CUSTOM
+        // ─────────────────────────────
+
+        if (item.type === "CUSTOM") {
+
+            const products =
+                item.product_details?.products || [];
+
+            const quantity =
+                item.reserved_quantity || 1;
+
+
+            for (const product of products) {
+
+                const productId =
+                    product.productId;
+
+                const variantId =
+                    product.variant?._id;
+
+                await checkVariantStock(
+                    productId,
+                    variantId,
+                    quantity
+                );
+            }
+        }
+    }
+};
+
+// ─── Stock check Helper ──────────────────────────
+const checkVariantStock = async (
+    productId,
+    variantId,
+    quantity
+) => {
+
+    const product =
+        await Product.findById(productId)
+            .select(
+                "product_name variantDocumentId"
+            )
+            .lean();
+
+
+    if (!product) {
+
+        throw new BadRequestError(
+            "Product not found"
+        );
+    }
+
+
+    const variantDoc =
+        await ProductVariant.findById(
+            product.variantDocumentId
+        ).lean();
+
+
+    if (!variantDoc) {
+
+        throw new BadRequestError(
+            `Variants not found for ${product.product_name}`
+        );
+    }
+
+
+    const variant =
+        variantDoc.variants.find(
+            v =>
+                v._id.toString() ===
+                variantId.toString()
+        );
+
+
+    if (!variant) {
+
+        throw new BadRequestError(
+            `Selected variant not found for ${product.product_name}`
+        );
+    }
+
+
+    const availableStock = variant.available_stock - (variant.reserved_stock || 0);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stock Check
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        !variant.allow_backorders &&
+        availableStock < quantity
+    ) {
+
+        throw new BadRequestError(
+            `${product.product_name} (${variant.weight}${variant.unit}) is not available. Please choose another variant of the same product.`
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Low Stock Rule
+    |--------------------------------------------------------------------------
+    */
+
+    const remainingStock = availableStock - quantity;
+
+
+    if (
+        !variant.allow_backorders &&
+        remainingStock < variant.low_stock_alert
+    ) {
+
+        throw new BadRequestError(
+            `${product.product_name} (${variant.weight}${variant.unit}) is not available. Please choose another variant of the same product.`
+        );
+    }
+
+
+    return true;
+};
+
+module.exports = { updateStockAfterOrder, checkStockBeforeOrder }

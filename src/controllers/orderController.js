@@ -7,7 +7,7 @@ const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
 const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCart.service');
-const { updateStockAfterOrder } = require('../services/updateStockAfterOrder')
+const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/stockService')
 const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
@@ -113,6 +113,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
     validateOrderItems(items);
 
+    await checkStockBeforeOrder(items);
 
     /*
     |--------------------------------------------------------------------------
@@ -131,247 +132,247 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     }
 
 
-  const calculatedAmount =
-    items.reduce(
-        (total, item) => {
+    const calculatedAmount =
+        items.reduce(
+            (total, item) => {
 
-            return (
-                total +
-                Number(
-                    item.product_details.totalAmount
-                )
+                return (
+                    total +
+                    Number(
+                        item.product_details.totalAmount
+                    )
+                );
+
+            },
+            0
+        );
+
+
+    let couponDiscount = 0;
+    let appliedCoupon = null;
+    let couponUsage = null;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Coupon Validation & Discount Calculation
+    |--------------------------------------------------------------------------
+    |
+    | Coupon agar hai to pehle coupon discount calculate hoga.
+    |
+    */
+
+    if (couponCode) {
+
+        const normalizedCouponCode =
+            couponCode
+                .trim()
+                .toUpperCase();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find Offer
+        |--------------------------------------------------------------------------
+        */
+
+        const offer =
+            await Offers.findOne({
+
+                couponCode:
+                    normalizedCouponCode,
+
+                isActive:
+                    true
+
+            });
+
+
+        if (!offer) {
+
+            throw new BadRequestError(
+                "Invalid or inactive coupon code"
             );
 
-        },
-        0
-    );
+        }
 
 
-let couponDiscount = 0;
-let appliedCoupon = null;
-let couponUsage = null;
+        /*
+        |--------------------------------------------------------------------------
+        | Check User Coupon Usage
+        |--------------------------------------------------------------------------
+        */
+
+        couponUsage =
+            await CouponUsage.findOne({
+
+                userId:
+                    user._id,
+
+                offerId:
+                    offer._id,
+
+                isApplied:
+                    true,
+
+                isAvailable:
+                    true
+
+            });
 
 
-/*
-|--------------------------------------------------------------------------
-| 7. Coupon Validation & Discount Calculation
-|--------------------------------------------------------------------------
-|
-| Coupon agar hai to pehle coupon discount calculate hoga.
-|
-*/
+        if (!couponUsage) {
 
-if (couponCode) {
+            throw new BadRequestError(
+                "Coupon has not been applied"
+            );
 
-    const normalizedCouponCode =
-        couponCode
-            .trim()
-            .toUpperCase();
+        }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find Offer
-    |--------------------------------------------------------------------------
-    */
+        /*
+        |--------------------------------------------------------------------------
+        | Calculate Coupon Discount
+        |--------------------------------------------------------------------------
+        */
 
-    const offer =
-        await Offers.findOne({
+        if (
+            offer.discountType ===
+            "PERCENTAGE"
+        ) {
 
-            couponCode:
-                normalizedCouponCode,
+            couponDiscount =
+                (
+                    calculatedAmount *
+                    offer.discountValue
+                ) / 100;
 
-            isActive:
-                true
+        }
 
-        });
+        else if (
+            offer.discountType ===
+            "FLAT"
+        ) {
 
+            couponDiscount =
+                offer.discountValue;
 
-    if (!offer) {
+        }
 
-        throw new BadRequestError(
-            "Invalid or inactive coupon code"
-        );
+        else {
 
-    }
+            throw new BadRequestError(
+                "Invalid coupon discount type"
+            );
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Check User Coupon Usage
-    |--------------------------------------------------------------------------
-    */
-
-    couponUsage =
-        await CouponUsage.findOne({
-
-            userId:
-                user._id,
-
-            offerId:
-                offer._id,
-
-            isApplied:
-                true,
-
-            isAvailable:
-                true
-
-        });
+        }
 
 
-    if (!couponUsage) {
-
-        throw new BadRequestError(
-            "Coupon has not been applied"
-        );
-
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Calculate Coupon Discount
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        offer.discountType ===
-        "PERCENTAGE"
-    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent Negative Amount
+        |--------------------------------------------------------------------------
+        */
 
         couponDiscount =
-            (
-                calculatedAmount *
-                offer.discountValue
+            Math.min(
+                couponDiscount,
+                calculatedAmount
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Round Coupon Discount
+        |--------------------------------------------------------------------------
+        */
+
+        couponDiscount =
+            Math.round(
+                couponDiscount * 100
             ) / 100;
 
     }
 
-    else if (
-        offer.discountType ===
-        "FLAT"
-    ) {
-
-        couponDiscount =
-            offer.discountValue;
-
-    }
-
-    else {
-
-        throw new BadRequestError(
-            "Invalid coupon discount type"
-        );
-
-    }
-
 
     /*
     |--------------------------------------------------------------------------
-    | Prevent Negative Amount
+    | 8. Calculate Amount After Coupon
     |--------------------------------------------------------------------------
+    |
+    | Coupon hai:
+    |
+    | calculatedAmount - couponDiscount
+    |
+    | Coupon nahi hai:
+    |
+    | calculatedAmount
+    |
     */
 
-    couponDiscount =
-        Math.min(
-            couponDiscount,
-            calculatedAmount
-        );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Round Coupon Discount
-    |--------------------------------------------------------------------------
-    */
-
-    couponDiscount =
-        Math.round(
-            couponDiscount * 100
-        ) / 100;
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| 8. Calculate Amount After Coupon
-|--------------------------------------------------------------------------
-|
-| Coupon hai:
-|
-| calculatedAmount - couponDiscount
-|
-| Coupon nahi hai:
-|
-| calculatedAmount
-|
-*/
-
-const amountAfterCoupon =
-    Math.round(
-        (
-            calculatedAmount -
-            couponDiscount
-        ) * 100
-    ) / 100;
-
-
-/*
-|--------------------------------------------------------------------------
-| 9. Add COD Charge
-|--------------------------------------------------------------------------
-|
-| COD → 25% extra
-|
-| Online → No extra charge
-|
-*/
-
-let codCharge = 0;
-
-let expectedFinalAmount =
-    amountAfterCoupon;
-
-
-if (payment_mode === "cod") {
-
-    codCharge =
-        Math.round(
-            amountAfterCoupon * 0.25 * 100
-        ) / 100;
-
-
-    expectedFinalAmount =
+    const amountAfterCoupon =
         Math.round(
             (
-                amountAfterCoupon +
-                codCharge
+                calculatedAmount -
+                couponDiscount
             ) * 100
         ) / 100;
 
-}
+
+    /*
+    |--------------------------------------------------------------------------
+    | 9. Add COD Charge
+    |--------------------------------------------------------------------------
+    |
+    | COD → 25% extra
+    |
+    | Online → No extra charge
+    |
+    */
+
+    let codCharge = 0;
+
+    let expectedFinalAmount =
+        amountAfterCoupon;
 
 
-/*
-|--------------------------------------------------------------------------
-| 10. Validate Frontend Final Amount
-|--------------------------------------------------------------------------
-*/
+    if (payment_mode === "cod") {
 
-if (
-    Math.round(finalAmount * 100) !==
-    Math.round(expectedFinalAmount * 100)
-) {
+        codCharge =
+            Math.round(
+                amountAfterCoupon * 0.25 * 100
+            ) / 100;
 
-    throw new BadRequestError(
 
-        `Final amount mismatch. Expected: ${expectedFinalAmount}, Received: ${finalAmount}`
+        expectedFinalAmount =
+            Math.round(
+                (
+                    amountAfterCoupon +
+                    codCharge
+                ) * 100
+            ) / 100;
 
-    );
+    }
 
-}
+
+    /*
+    |--------------------------------------------------------------------------
+    | 10. Validate Frontend Final Amount
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        Math.round(finalAmount * 100) !==
+        Math.round(expectedFinalAmount * 100)
+    ) {
+
+        throw new BadRequestError(
+
+            `Final amount mismatch. Expected: ${expectedFinalAmount}, Received: ${finalAmount}`
+
+        );
+
+    }
 
     if (couponCode) {
 
@@ -500,41 +501,41 @@ if (
 
     const orderGroup = await Ordergroup.create({
 
-            group_id,
+        group_id,
 
-            userId: user._id,
+        userId: user._id,
 
-            orderIds: [],
+        orderIds: [],
 
-            cod_amount: codCharge,
+        cod_amount: codCharge,
 
-            totalAmount: calculatedAmount,
+        totalAmount: calculatedAmount,
 
-            coupon:
-                appliedCoupon || {
+        coupon:
+            appliedCoupon || {
 
-                    offerId: null,
+                offerId: null,
 
-                    couponCode: null,
+                couponCode: null,
 
-                    discountType: null,
+                discountType: null,
 
-                    discountValue: 0,
+                discountValue: 0,
 
-                    discountAmount: 0
+                discountAmount: 0
 
-                },
+            },
 
-            finalAmount: finalAmount,
+        finalAmount: finalAmount,
 
-            payment_mode,
+        payment_mode,
 
-            payment_status:
-                "pending",
+        payment_status:
+            "pending",
 
-            payment: {}
+        payment: {}
 
-        });
+    });
 
     if (couponUsage) {
 
@@ -746,31 +747,31 @@ if (
 
     const razorpayOrder = await razorpay.orders.create({
 
-            amount:
-                razorpayAmount,
+        amount:
+            razorpayAmount,
 
-            currency:
-                "INR",
+        currency:
+            "INR",
 
-            receipt:
-                group_id,
+        receipt:
+            group_id,
 
-            notes: {
+        notes: {
 
-                user_id:
-                    String(user._id),
+            user_id:
+                String(user._id),
 
-                order_group_id:
-                    String(orderGroup._id),
+            order_group_id:
+                String(orderGroup._id),
 
-                group_id
+            group_id
 
-            },
+        },
 
-            partial_payment:
-                false
+        partial_payment:
+            false
 
-        });
+    });
 
 
     /*
