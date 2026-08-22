@@ -1,3 +1,4 @@
 {
-    "editor.inlineSuggest.enabled": false
+    "editor.inlineSuggest.enabled": true,
+    "editor.inlineSuggest.edits.showCollapsed": false
 }

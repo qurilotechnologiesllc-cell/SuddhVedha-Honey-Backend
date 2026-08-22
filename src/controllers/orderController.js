@@ -72,9 +72,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const user =
-        await User.findById(id)
-            .select("_id");
+    const user = await User.findById(id).select("_id");
 
     if (!user) {
         throw new NotFoundError(
@@ -746,8 +744,7 @@ if (
     |
     */
 
-    const razorpayOrder =
-        await razorpay.orders.create({
+    const razorpayOrder = await razorpay.orders.create({
 
             amount:
                 razorpayAmount,
