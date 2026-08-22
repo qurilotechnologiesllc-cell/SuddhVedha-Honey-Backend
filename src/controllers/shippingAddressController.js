@@ -68,7 +68,11 @@ const getUserAllShippingAddress = asyncHandler(async (req, res) => {
     const AllShippingAddress = await ShippingAddress.find({ user_id: id })
 
     if (!AllShippingAddress || AllShippingAddress.length === 0) {
-        throw new NotFoundError('No Shipping Address found for this users')
+        return res.status(204).json({
+            success: true,
+            message: 'No Shipping Addresses found for this user',
+            data: []
+        });
     }
 
     res.status(200).json({

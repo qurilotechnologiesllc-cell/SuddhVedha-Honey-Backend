@@ -59,7 +59,11 @@ const getUserAddresses = asyncHandler(async (req, res) => {
     });
 
     if (!addresses || addresses.length === 0) {
-        throw new NotFoundError('No addresses found for this user');
+        return res.status(204).json({
+            success: true,
+            message: 'No addresses found for this user',
+            data: []
+        }); 
     }
 
     res.status(200).json({
