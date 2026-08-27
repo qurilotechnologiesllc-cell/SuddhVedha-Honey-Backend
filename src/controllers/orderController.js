@@ -1021,7 +1021,7 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
                     price: item.product_details?.product?.variant?.price,
                     mrp: item.product_details?.product?.variant?.mrp
                 },
-                amount: item.product_details?.finalAmount
+                amount: item.product_details?.totalAmount
             }),
 
             // Custom Gift Box
