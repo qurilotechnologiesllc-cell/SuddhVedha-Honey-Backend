@@ -28,39 +28,29 @@ const planDeliverySchema = new mongoose.Schema(
         // Product sent in this delivery
         // ─────────────────────────────────────
 
-        product: {
+        products: [
+            {
+                productId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Product"
+                },
 
-            productId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Product",
-                required: true
-            },
+                variantId: {
+                    type: mongoose.Schema.Types.ObjectId
+                },
 
-            variantId: {
-                type: mongoose.Schema.Types.ObjectId,
-                required: true
-            },
+                productName: String,
 
-            productName: {
-                type: String,
-                required: true
-            },
+                quantity: {
+                    type: Number,
+                    required: true
+                },
 
-            quantity: {
-                type: Number,
-                required: true,
-                min: 1
-            },
+                quantityPerJar: Number,
 
-            quantityPerJar: {
-                type: Number
-            },
-
-            quantityUnit: {
-                type: String
+                quantityUnit: String
             }
-
-        },
+        ],
 
 
         // ─────────────────────────────────────
@@ -392,8 +382,6 @@ const purchasePlanSchema = new mongoose.Schema(
         endDate: {
             type: Date
         }
-
-        
 
     },
     {

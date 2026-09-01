@@ -25,7 +25,8 @@ const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
 const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 const InfluencerDetails = require('./routes/InfluencerDetailsRoute.js');
 const UserOrderRoutes = require('./routes/userOrderRoute.js');
-const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js')
+const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js');
+const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js')
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
@@ -117,7 +118,8 @@ app.use('/api/purchase-plans', PurchasePlanRoutes);
 app.use('/api/admin', adminAuthRoutes);
 app.use('/api/dashboard', productDashboardRoutes);
 app.use('/api/notification', notificationRoutes);
-app.use('/api/subscripation/plan', SubscripationsPlans)
+app.use('/api/subscripation/plan', SubscripationsPlans);
+app.use('/api/admin/plan-orders', adminPlanOrdersRoute);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
