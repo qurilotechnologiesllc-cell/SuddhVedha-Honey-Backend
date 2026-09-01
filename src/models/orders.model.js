@@ -9,7 +9,7 @@ const orderItemSchema = new mongoose.Schema({
 
     type: {
         type: String,
-        enum: ['NORMAL', 'CUSTOM'],
+        enum: ['NORMAL', 'CUSTOM', ' "PLAN"'],
         required: true
     },
 
@@ -71,9 +71,26 @@ const orderSchema = new mongoose.Schema({
     order_group_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "OrderGroup",
-        required: true
+        default: null,
+        index: true
     },
 
+    plan_purchase_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PurchasePlanDetails",
+        default: null,
+        index: true
+    },
+
+    plan_delivery_number: {
+        type: Number,
+        default: null
+    },
+
+    plan_delivery_date: {
+        type: Date,
+        default: null
+    },
 
     // ─────────────────────────────────────────
     // Order Items

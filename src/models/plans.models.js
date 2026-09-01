@@ -122,6 +122,24 @@ const plansSchema = new Schema(
             default: false,
         },
 
+
+        durationMonths: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+
+        deliveriesPerMonth: {
+            type: Number,
+            default: 1
+        },
+
+        jarsPerDelivery: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+
         // Whether users can currently purchase this plan
         isActive: {
             type: Boolean,

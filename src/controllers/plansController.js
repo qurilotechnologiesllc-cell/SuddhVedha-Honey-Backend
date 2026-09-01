@@ -32,6 +32,9 @@ const addSubscripationPlans = asyncHandler(async (req, res) => {
         currency,
         badge,
         isPopular,
+        durationMonths,
+        deliveriesPerMonth,
+        jarsPerDelivery,
         isActive,
         displayOrder,
     } = req.body
@@ -234,6 +237,12 @@ const addSubscripationPlans = asyncHandler(async (req, res) => {
                     ? true
                     : isActive === true ||
                     isActive === 'true',
+
+            durationMonths: durationMonths || 6,
+
+            deliveriesPerMonth: deliveriesPerMonth || 1,
+
+            jarsPerDelivery: jarsPerDelivery || 1,
 
             displayOrder:
                 displayOrder !== undefined

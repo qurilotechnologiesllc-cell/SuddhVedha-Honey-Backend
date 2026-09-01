@@ -25,6 +25,7 @@ const UpcomingProductRoutes = require('./routes/upcomingProductsRoute');
 const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 const InfluencerDetails = require('./routes/InfluencerDetailsRoute.js');
 const UserOrderRoutes = require('./routes/userOrderRoute.js');
+const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js')
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
@@ -110,6 +111,7 @@ app.use('/api/upcoming', UpcomingProductRoutes);
 app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
 app.use('/api/influencer', InfluencerDetails);
 app.use('/api/order', UserOrderRoutes);
+app.use('/api/purchase-plans', PurchasePlanRoutes);
 
 // Admin Routes
 app.use('/api/admin', adminAuthRoutes);
