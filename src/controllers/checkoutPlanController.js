@@ -232,14 +232,8 @@ const checkoutPlan = asyncHandler(async (req, res) => {
                 name:
                     plan.name,
 
-                description:
-                    plan.description,
-
-                image:
+                plan_image:
                     plan.image,
-
-                public_id:
-                    plan.public_id,
 
                 packageLabel:
                     plan.packageLabel,
@@ -342,11 +336,9 @@ const checkoutPlan = asyncHandler(async (req, res) => {
 
             totalDeliveries: plan.durationMonths * plan.deliveriesPerMonth,
 
-            completedDeliveries:
-                0,
+            completedDeliveries: 0,
 
-            currentDeliveryNumber:
-                0
+            currentDeliveryNumber: 0
 
         });
 
@@ -1079,7 +1071,7 @@ const getmyPlanPurchases = asyncHandler(async (req, res) => {
 
             userId: user._id
 
-        }).sort({ createdAt: -1 });
+        }).select('-shipping_address -billing_address -payment').sort({ createdAt: -1 });
 
     return res.status(200).json({
 

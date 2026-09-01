@@ -182,6 +182,11 @@ const purchasePlanSchema = new mongoose.Schema(
                 required: true
             },
 
+            plan_image: {
+                type: String,
+                default: ""
+            },
+
             packageLabel: String,
 
             quantityPerJar: Number,
