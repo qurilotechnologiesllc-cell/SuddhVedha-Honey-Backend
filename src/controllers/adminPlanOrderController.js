@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const Order = require("../models/orders.model");
 const PurchasePlanDetails = require("../models/purchaseplan.model");
+const Products = require('../models/product.model')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
 
 const generateOrderId = () => {
@@ -15,8 +16,8 @@ const generateOrderId = () => {
 
 const getAllpurchasePlansbyUser = asyncHandler(async (req, res) => {
 
-    const {role} = req.user;
-    
+    const { role } = req.user;
+
     if (role !== "admin") {
         throw new ForbiddenError("Access denied. Admins only.");
     }
@@ -129,8 +130,8 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // ─────────────────────────────────────────
 
     const purchase = await PurchasePlanDetails.findById(
-            planPurchaseId
-        );
+        planPurchaseId
+    );
 
 
     if (!purchase) {
@@ -464,7 +465,60 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
 
 });
 
+const getproductDetails = asyncHandler(async (req, res) => {
+    const { role } = req.user
+
+    if (role !== "admin") {
+        throw new ForbiddenError("Access denied. Admins only.");
+    }
+
+    const products = await Products.find({ is_active: true })
+        .populate({
+            path: 'categoryId',
+            select: 'category_name description slug -_id'
+        })
+        .populate({
+            path: 'variantDocumentId',
+            select: 'variants -_id'
+        })
+        .populate({
+            path: 'imageDocumentId',
+            select: 'images -_id'
+        })
+        .select('-videoDocumentId -createdAt -__v')
+        .lean();
+
+
+
+    // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li
+    const formattedProducts = products.map(product => {
+        let singleImage = null;
+        let singleVariant = null;
+
+        // Check kiya ki images object aur uske andar ka images array exist karta hai ya nahi
+        if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
+            singleImage = product.imageDocumentId.images[0]; // Sirf pehla image object uthaya
+        }
+        // Variants array se 1st variant nikala
+        if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
+            singleVariant = product.variantDocumentId.variants;
+        }
+
+        return {
+            ...product,
+            imageDocumentId: singleImage, // Pura object hata kar sirf single image object set kar diya
+            variantDocumentId: singleVariant
+        };
+    });
+
+    res.status(200).json({
+        success: true,
+        data: formattedProducts // Modified data bheja
+    });
+})
+
 module.exports = {
     getAllpurchasePlansbyUser,
-    createPlanDeliveryOrder
+    createPlanDeliveryOrder,
+    getproductDetails
 };
