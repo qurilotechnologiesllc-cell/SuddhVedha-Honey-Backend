@@ -131,9 +131,6 @@ const sendEmailforOtp = async (adminEmail, fullname, otp) => {
 
 const sendupdateEnquiryEmail = async (userinfo) => {
 
-    console.log(userinfo);
-    
-
     const { userEmail, fullname, message, status } = userinfo
     try {
 
@@ -200,4 +197,77 @@ const sendupdateEnquiryEmail = async (userinfo) => {
     }
 }
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail };
+const sendnotificationEmailToUser = async (userInfo, orderdetails) => {
+    const { email, name } = userInfo
+    const { customerName, planName, orderId, orderDate, totalAmount, productName, quantity, weight, productDescription, deliveryDate, deliveryAddress } = orderdetails
+    try {
+
+        const response =
+            await brevo.transactionalEmails.sendTransacEmail({
+
+                sender: {
+
+                    email: process.env.BREVO_SENDER_EMAIL,
+
+                    name: process.env.BREVO_SENDER_NAME
+
+                },
+
+                to: [
+
+                    {
+
+                        email: email,
+
+                        name: name
+
+                    }
+
+                ],
+
+                templateId: Number(process.env.BREVO_ORDER_CONFIRMATION_TEMPLATE_ID),
+
+                params: {
+                    customerName,
+                    planName,
+                    orderId,
+                    orderDate,
+                    totalAmount,
+                    productName,
+                    quantity,
+                    weight,
+                    productDescription,
+                    deliveryDate,
+                    deliveryAddress
+                }
+
+            });
+
+        console.log("✅ Email Sent", response);
+
+        return {
+
+            success: true,
+
+            data: response
+
+        };
+
+    }
+
+    catch (error) {
+
+        console.error(error);
+
+        return {
+
+            success: false,
+
+            error: error.message
+
+        };
+
+    }
+}
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser };

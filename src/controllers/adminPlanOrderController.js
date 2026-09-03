@@ -3,6 +3,7 @@ const Order = require("../models/orders.model");
 const PurchasePlanDetails = require("../models/purchaseplan.model");
 const Products = require('../models/product.model')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
+const { sendnotificationEmailToUser } = require('../utils/sendEmail')
 
 const generateOrderId = () => {
     const date = new Date()
@@ -129,9 +130,13 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // 4. Find Plan Purchase
     // ─────────────────────────────────────────
 
-    const purchase = await PurchasePlanDetails.findById(
-        planPurchaseId
-    );
+    const purchase = await PurchasePlanDetails
+        .findById(planPurchaseId)
+        .populate({
+            path: "planId",
+            select: "name description packageLabel"
+        });
+
 
 
     if (!purchase) {
@@ -176,8 +181,7 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // 7. Calculate Next Delivery Number
     // ─────────────────────────────────────────
 
-    const nextDeliveryNumber =
-        purchase.currentDeliveryNumber + 1;
+    const nextDeliveryNumber = purchase.currentDeliveryNumber + 1;
 
 
     // ─────────────────────────────────────────
@@ -252,8 +256,7 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // 11. Create Plan Order
     // ─────────────────────────────────────────
 
-    const order =
-        await Order.create({
+    const order = await Order.create({
 
             order_id,
 
@@ -371,17 +374,14 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // 13. Push Delivery
     // ─────────────────────────────────────────
 
-    purchase.deliveries.push(
-        delivery
-    );
+    purchase.deliveries.push(delivery);
 
 
     // ─────────────────────────────────────────
     // 14. Update Current Delivery
     // ─────────────────────────────────────────
 
-    purchase.currentDeliveryNumber =
-        nextDeliveryNumber;
+    purchase.currentDeliveryNumber = nextDeliveryNumber;
 
 
     // NOTE:
@@ -389,6 +389,38 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     // only after actual successful delivery.
 
     await purchase.save();
+
+    const userInfo = {
+        email: purchase.customer?.email,
+        name: purchase.customer?.name
+    }
+
+    const products = items.map((item) => {
+        const product = item.product_details?.product;
+        const variant = product?.variant;
+        return {
+            productName: product?.product_name || "Product",
+            quantity: item.quantity || 0,
+            weight: variant?.weight ? `${variant.weight}${variant.unit || "g"}` : "",
+            productDescription: product?.description || ""
+        };
+    });
+
+    const orderdetails = {
+        customerName: purchase.customer?.name,
+        planName: purchase.planId.name,
+        orderId: order_id,
+        orderDate: new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        totalAmount: orderAmount,
+        productName: products[0]?.productName || "",
+        quantity: products[0]?.quantity?.toString() || "",
+        weight: products[0]?.weight || "",
+        productDescription: purchase.planId.description,
+        deliveryDate: plan_delivery_date,
+        deliveryAddress: purchase.shipping_address
+    }
+
+    const result = await sendnotificationEmailToUser(userInfo, orderdetails)
 
 
     // ─────────────────────────────────────────
