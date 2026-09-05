@@ -68,7 +68,9 @@ app.use(cors({
 
     "https://suddhveda.vercel.app",
 
-    "https://k8jz7ljm-3051.inc1.devtunnels.ms"
+    "https://k8jz7ljm-3051.inc1.devtunnels.ms", 
+    
+     "https://shuddhvedaadmin.vercel.app"
   ],
 
   credentials: true

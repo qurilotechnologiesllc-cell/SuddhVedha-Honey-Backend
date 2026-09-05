@@ -547,7 +547,7 @@ const getproductDetails = asyncHandler(async (req, res) => {
         success: true,
         data: formattedProducts // Modified data bheja
     });
-})
+});
 
 module.exports = {
     getAllpurchasePlansbyUser,
