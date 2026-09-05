@@ -139,7 +139,8 @@ const orderSchema = new mongoose.Schema({
             'netbanking',
             'wallet',
             'emi',
-            'cod'
+            'cod',
+            'paid'
         ],
         required: true
     },

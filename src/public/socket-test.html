@@ -92,6 +92,42 @@ socket.on("new-notification",(data)=>{
 
 });
 
+socket.on("new-order",(data)=>{
+
+    console.log(data);
+
+    const div=document.createElement("div");
+
+    div.className="card";
+
+    div.innerHTML=`
+
+        <h3>${data.title}</h3>
+
+        <p><b>Order message :</b> ${data.message}</p>
+
+         <p><b>User Name :</b> ${data.userName}</p>
+
+          <p><b>User Mobile :</b> ${data.userMobile}</p>
+
+        <p><b>Order COD Amount :</b> ${data.cod_amount}</p>
+
+        <p><b>Order IDS :</b> ${data.orderIds}</p>
+
+        <p><b>Amount :</b> ${data.finalAmount}</p>
+
+        <p><b>OrderInformation :</b> ${data.orderdetails}</p>
+
+        <p>${data.orderDate}</p>
+
+    `;
+
+    document
+        .getElementById("notifications")
+        .prepend(div);
+
+}); 
+
 </script>
 
 </body>

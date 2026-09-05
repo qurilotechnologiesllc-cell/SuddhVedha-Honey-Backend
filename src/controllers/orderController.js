@@ -7,8 +7,9 @@ const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
 const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCart.service');
-const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/stockService')
-const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders')
+const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/stockService');
+const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders');
+const { getIO, ADMIN_ROOM } = require('../utils/socketHandler');
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
@@ -646,14 +647,10 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-        const orderIds =
-            createdOrders.map(
-                order => order._id
-            );
+        const orderIds = createdOrders.map(order => order._id);
 
 
-        orderGroup.orderIds =
-            orderIds;
+        orderGroup.orderIds = orderIds;
 
 
         await orderGroup.save();
@@ -664,6 +661,36 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         | COD Response
         |--------------------------------------------------------------------------
         */
+
+        const io = getIO();
+
+        io.to(ADMIN_ROOM).emit("new-order", {
+
+            title: "New COD Order Placed",
+
+            message: `Order group ${orderGroup.group_id} has been placed.`,
+
+            userName: user.name || "Unknown User",
+
+            userMobile: user.mobile || "Unknown Mobile",
+
+            finalAmount: orderGroup.finalAmount,
+
+            cod_amount: orderGroup.cod_amount,
+
+            orderIds: orderGroup.orderIds,
+
+            orderDate: new Date().toLocaleString(),
+
+            orderdetails: createdOrders.map(order => ({
+                _id: order._id,
+                order_id: order.order_id,
+                payment_mode: order.payment_mode,
+                payment_status: order.payment_status,
+                order_status: order.order_status,
+                items: order.items
+            }))
+        });
 
         return res.status(201).json({
 
@@ -729,10 +756,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const razorpayAmount =
-        Math.round(
-            finalAmount * 100
-        );
+    const razorpayAmount = Math.round(finalAmount * 100);
 
 
     /*
@@ -888,6 +912,36 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
 
     await orderGroup.save();
+
+    const io = getIO();
+
+    io.to(ADMIN_ROOM).emit("new-order", {
+
+        title: "New Order Placed",
+
+        message: `Order group ${orderGroup.group_id} has been placed.`,
+
+        userName: user.name || "Unknown User",
+
+        userMobile: user.mobile || "Unknown Mobile",
+
+        finalAmount: orderGroup.finalAmount,
+
+        cod_amount: orderGroup.cod_amount || 0,
+
+        orderIds: orderGroup.orderIds,
+
+        orderDate: new Date().toLocaleString(),
+
+        orderdetails: createdOrders.map(order => ({
+            _id: order._id,
+            order_id: order.order_id,
+            payment_mode: order.payment_mode,
+            payment_status: order.payment_status,
+            order_status: order.order_status,
+            items: order.items
+        }))
+    })
 
 
     /*

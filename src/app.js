@@ -32,7 +32,8 @@ const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js')
 const adminAuthRoutes = require('./routes/adminAuthRoute');
 const productDashboardRoutes = require('./routes/productDashboardRoute');
 const notificationRoutes = require('./routes/notificationRoute');
-const SubscripationsPlans = require('./routes/plansRoute.js')
+const SubscripationsPlans = require('./routes/plansRoute.js');
+const adminOrderDashboardRoutes = require('./routes/adminOrderDashboardRoute.js');
 
 app.use(
   express.json({
@@ -69,7 +70,7 @@ app.use(cors({
     "https://suddhveda.vercel.app",
 
     "https://k8jz7ljm-3051.inc1.devtunnels.ms", 
-    
+
      "https://shuddhvedaadmin.vercel.app"
   ],
 
@@ -122,6 +123,7 @@ app.use('/api/dashboard', productDashboardRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/subscripation/plan', SubscripationsPlans);
 app.use('/api/admin/plan-orders', adminPlanOrdersRoute);
+app.use('/api/admin/order-dashboard', adminOrderDashboardRoutes);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
