@@ -26,7 +26,7 @@ const bulkOrderEnquiry = require('./routes/bulkOrderEnquiryRoute');
 const InfluencerDetails = require('./routes/InfluencerDetailsRoute.js');
 const UserOrderRoutes = require('./routes/userOrderRoute.js');
 const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js');
-const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js')
+const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js');
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
@@ -34,6 +34,9 @@ const productDashboardRoutes = require('./routes/productDashboardRoute');
 const notificationRoutes = require('./routes/notificationRoute');
 const SubscripationsPlans = require('./routes/plansRoute.js');
 const adminOrderDashboardRoutes = require('./routes/adminOrderDashboardRoute.js');
+
+// Order Services
+const velocityOrderServiceRoute = require('./routes/velocityOrderServiceRoute.js');
 
 app.use(
   express.json({
@@ -124,6 +127,9 @@ app.use('/api/notification', notificationRoutes);
 app.use('/api/subscripation/plan', SubscripationsPlans);
 app.use('/api/admin/plan-orders', adminPlanOrdersRoute);
 app.use('/api/admin/order-dashboard', adminOrderDashboardRoutes);
+
+// Order Services
+app.use('/api/order-service', velocityOrderServiceRoute);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
