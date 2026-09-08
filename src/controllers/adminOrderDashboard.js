@@ -27,6 +27,7 @@ const getAllOrders = asyncHandler(async (req, res) => {
     ]);
 
     const formattedOrders = orderGroups.map((group) => ({
+        id: group._id,
         group_id: group.group_id,
         customer: group.userId,
         payment_mode: group.payment_mode,
