@@ -34,6 +34,26 @@ const orderGroupSchema = new mongoose.Schema({
         default: 0
     },
 
+    length: {
+        type: Number,
+        default: 0
+    },
+
+    breadth: {
+        type: Number,
+        default: 0
+    },
+
+    height: {
+        type: Number,
+        default: 0
+    },
+
+    weight: {
+        type: Number,
+        default: 0
+    },
+
     coupon: {
 
         offerId: {

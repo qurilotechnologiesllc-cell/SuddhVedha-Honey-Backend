@@ -190,7 +190,8 @@ const orderSchema = new mongoose.Schema({
             'delivered',
             'cancelled',
             'returned',
-            'refunded'
+            'refunded',
+            'confirmed'
         ],
         default: 'pending',
         index: true
