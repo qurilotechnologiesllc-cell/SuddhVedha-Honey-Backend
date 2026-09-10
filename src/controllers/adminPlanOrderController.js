@@ -1,7 +1,10 @@
 const crypto = require('crypto')
+const axios = require('axios')
 const Order = require("../models/orders.model");
+const Ordergroup = require('../models/orderGoup.model')
 const PurchasePlanDetails = require("../models/purchaseplan.model");
 const Products = require('../models/product.model')
+const VelocitySchema = require('../models/velocityOrder.model')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
 const { sendnotificationEmailToUser } = require('../utils/sendEmail')
 
@@ -14,6 +17,32 @@ const generateOrderId = () => {
 
     return `SV - ${yyyy}${mm}${dd} -${random}`
 }
+
+const generateOrderGroupId = () => {
+
+    const date = new Date();
+
+    const yyyy =
+        date.getUTCFullYear();
+
+    const mm =
+        String(
+            date.getUTCMonth() + 1
+        ).padStart(2, "0");
+
+    const dd =
+        String(
+            date.getUTCDate()
+        ).padStart(2, "0");
+
+    const random =
+        crypto
+            .randomBytes(4)
+            .toString("hex")
+            .toUpperCase();
+
+    return `SG-${yyyy}${mm}${dd}-${random}`;
+};
 
 const getAllpurchasePlansbyUser = asyncHandler(async (req, res) => {
 
@@ -32,7 +61,7 @@ const getAllpurchasePlansbyUser = asyncHandler(async (req, res) => {
     });
 });
 
-const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
+const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
 
     const { role } = req.user;
 
@@ -43,7 +72,12 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     const {
         planPurchaseId,
         items,
-        plan_delivery_date
+        plan_delivery_date,
+        carrier_id,
+        length,
+        breadth,
+        height,
+        weight
     } = req.body;
 
 
@@ -258,62 +292,235 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
 
     const order = await Order.create({
 
-            order_id,
+        order_id,
 
-            userId:
-                purchase.userId,
+        userId:
+            purchase.userId,
 
-            order_group_id:
-                null,
+        order_group_id:
+            null,
 
-            plan_purchase_id:
-                purchase._id,
+        plan_purchase_id:
+            purchase._id,
 
-            plan_delivery_number:
-                nextDeliveryNumber,
+        plan_delivery_number:
+            nextDeliveryNumber,
 
-            plan_delivery_date:
-                deliveryDate,
+        plan_delivery_date:
+            deliveryDate,
 
-            items,
+        items,
 
-            /*
-            |--------------------------------------------------------------------------
-            | Plan already paid during subscription purchase
-            |--------------------------------------------------------------------------
-            */
 
+        totalAmount: orderAmount,
+
+        shipping_address:
+            purchase.shipping_address,
+
+        billing_address:
+            purchase.billing_address,
+
+        payment_mode:
+            purchase.payment_mode,
+
+        payment_status: purchase.payment_status,
+
+        payment:
+            purchase.payment,
+
+        order_status:
+            "processing",
+
+        inventory_status:
+            "reserved",
+
+        customer_note:
+            "",
+
+        admin_note:
+            ""
+
+    });
+
+    const group_id = generateOrderGroupId();
+
+    const orderGroup =
+        await Ordergroup.create({
+            group_id,
+            userId: purchase.userId,
+            orderIds: [
+                order._id
+            ],
             totalAmount: orderAmount,
 
-            shipping_address:
-                purchase.shipping_address,
+            finalAmount: orderAmount,
+            cod_amount: purchase.payment_mode === "cod" ? orderAmount : 0,
+            length: Number(length || 0),
+            breadth: Number(breadth || 0),
+            height: Number(height || 0),
+            weight: Number(weight || 0),
 
-            billing_address:
-                purchase.billing_address,
-
-            payment_mode:
-                purchase.payment_mode,
-
-            payment_status:
-                "captured",
-
-            payment:
-                purchase.payment,
-
-            order_status:
-                "processing",
-
-            inventory_status:
-                "reserved",
-
-            customer_note:
-                "",
-
-            admin_note:
-                ""
-
+            coupon: {
+                offerId: null,
+                couponCode: null,
+                discountType: null,
+                discountValue: 0,
+                discountAmount: 0
+            },
+            payment_mode: purchase.payment_mode,
+            payment_status: purchase.payment_status,
+            payment: purchase.payment
         });
 
+    order.order_group_id = orderGroup._id;
+
+    // ─────────────────────────────────────────
+    // 11.1 Prepare Velocity Payload
+    // ─────────────────────────────────────────
+    const velocityPayload = {
+
+        order_id: orderGroup.group_id,
+
+        order_date:
+            new Date(order.createdAt)
+                .toISOString()
+                .slice(0, 16)
+                .replace("T", " "),
+
+        carrier_id:
+            carrier_id,
+
+        billing_customer_name:
+            order.billing_address?.full_name || "",
+
+        billing_last_name:
+            "",
+
+        billing_address:
+            order.billing_address?.address_line1 || "",
+
+        billing_city:
+            order.billing_address?.city || "",
+
+        billing_pincode:
+            order.billing_address?.pincode || "",
+
+        billing_state:
+            order.billing_address?.state || "",
+
+        billing_country:
+            order.billing_address?.country || "India",
+
+        billing_email:
+            purchase.customer?.email || "",
+
+        billing_phone:
+            order.billing_address?.phone || "",
+
+        shipping_is_billing: true,
+
+        print_label:
+            true,
+
+        order_items:
+            order.items.map(item => {
+
+                const product =
+                    item.product_details?.product;
+
+                const variant =
+                    product?.variant;
+
+                return {
+
+                    name:
+                        product?.product_name || "",
+
+                    sku:
+                        variant?._id || "",
+
+                    units:
+                        Number(item.quantity || 0),
+
+                    selling_price:
+                        Number(variant?.price || 0),
+
+                    discount:
+                        Number(
+                            item.product_details?.totalsave || 0
+                        )
+                };
+            }),
+
+        payment_method: "PREPAID",
+
+        sub_total:
+            Number(order.totalAmount || 0),
+
+        cod_collectible:
+            0,
+
+        length:
+            Number(length || 0),
+
+        breadth:
+            Number(breadth || 0),
+
+        height:
+            Number(height || 0),
+
+        weight:
+            Number(weight || 0),
+
+        pickup_location: "HomeNew",
+
+        warehouse_id:
+            process.env.VELOCITY_WAREHOUSE_ID,
+
+        vendor_details: {
+
+            email: "shuddhvedahoney@gmail.com",
+
+            phone: "8175022207",
+
+            name: "ShuddhVeda Honey",
+
+            address: "Rz-91/2, First Floor, Mohan Garden, Opposite Metro Pillar 745",
+
+            address_2: "",
+
+            city: "Delhi",
+
+            state: "Delhi",
+
+            country: "India",
+
+            pin_code: "110059",
+
+            pickup_location: "HomeNew"
+        }
+    };
+
+    const velocityResult = await createOrderOnVelocity({
+        payload: velocityPayload,
+        orderGroupId: orderGroup._id,
+        orderIds: [order._id],
+        merchantOrderId: orderGroup.group_id
+    });
+
+
+    if (!velocityResult.success) {
+        return res.status(velocityResult.error?.status || 500).json({
+            success: false, message: "Order created locally but Velocity order creation failed",
+            error: velocityResult.error,
+            velocityResponse: velocityResult.velocityResponse,
+            velocityOrder: velocityResult.velocityOrder
+        });
+    }
+
+    order.order_status = "confirmed";
+
+    await order.save();
 
     // ─────────────────────────────────────────
     // 12. Create Delivery History Entry
@@ -327,17 +534,13 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
         orderId:
             order._id,
 
-        status:
-            "processing",
+        status: order.order_status,
 
-        scheduledDate:
-            deliveryDate,
+        scheduledDate: deliveryDate,
 
-        shippedAt:
-            null,
+        shippedAt: null,
 
-        deliveredAt:
-            null,
+        deliveredAt: null,
 
         products:
             items.map(item => ({
@@ -477,6 +680,22 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
 
         },
 
+        orderGroup: {
+            _id: orderGroup._id,
+            group_id: orderGroup.group_id,
+            userId: orderGroup.userId,
+            orderIds: orderGroup.orderIds,
+            totalAmount: orderGroup.totalAmount,
+            finalAmount: orderGroup.finalAmount,
+            cod_amount: orderGroup.cod_amount,
+            length: orderGroup.length,
+            breadth: orderGroup.breadth,
+            height: orderGroup.height,
+            weight: orderGroup.weight,
+            payment_mode: orderGroup.payment_mode,
+            payment_status: orderGroup.payment_status
+        },
+
         plan: {
 
             purchase_id:
@@ -496,6 +715,91 @@ const createPlanDeliveryOrder = asyncHandler(async (req, res) => {
     });
 
 });
+
+const createOrderOnVelocity = async ({
+    payload,
+    orderGroupId,
+    orderIds,
+    merchantOrderId
+}) => {
+
+    try {
+
+        const response = await axios.post(`${process.env.VELOCITY_BASE_URL}/custom/api/v1/forward-order-orchestration`,
+            payload,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${process.env.VELOCITY_TOKEN}`
+                }
+            }
+        );
+
+        const velocityData = response.data;
+
+        // Save Velocity order details in the database
+        const velocityOrder = new VelocitySchema({
+            orderGroupId,
+            orderIds,
+            merchantOrderId,
+            velocityOrderId: velocityData.payload.order_id,
+            shipmentId: velocityData.payload.shipment_id,
+            awbCode: velocityData.payload.awb_code,
+            courierCompanyId: velocityData.payload.courier_company_id,
+            courierName: velocityData.payload.courier_name,
+            labelUrl: velocityData.payload.label_url,
+            manifestUrl: velocityData.payload.manifest_url,
+            pickupTokenNumber: velocityData.payload.pickup_token_number || null,
+            rawResponse: velocityData,
+            status: velocityData?.status === 1 ? "SUCCESS" : "FAILED",
+            error: velocityData?.status === 1 ? null : velocityData
+        });
+
+        await velocityOrder.save();
+
+        return {
+            success: velocityData?.status === 1,
+            velocityResponse: velocityData,
+            velocityOrder
+        };
+
+    } catch (error) {
+
+        const errorData = error.response?.data || null;
+        const velocityOrder = await VelocitySchema.create({
+            orderGroupId,
+            orderIds,
+            merchantOrderId,
+            velocityOrderId: errorData?.payload?.order_id || null,
+            shipmentId: errorData?.payload?.shipment_id || null,
+            awbCode: errorData?.payload?.awb_code || null,
+            courierCompanyId: errorData?.payload?.courier_company_id || null,
+            courierName: errorData?.payload?.courier_name || null,
+            labelUrl: errorData?.payload?.label_url || null,
+            manifestUrl: errorData?.payload?.manifest_url || null,
+            pickupTokenNumber: errorData?.payload?.pickup_token_number || null,
+            rawResponse: errorData, status: "FAILED",
+            error: {
+                message: error.message,
+                status: error.response?.status || null,
+                data: errorData
+            }
+        });
+
+        return {
+            success: false,
+            velocityResponse: errorData,
+            velocityOrder,
+            error: {
+                message: error.message,
+                status: error.response?.status || null,
+                data: errorData
+            }
+        };
+    }
+
+};
+
 
 const getproductDetails = asyncHandler(async (req, res) => {
     const { role } = req.user
@@ -551,6 +855,6 @@ const getproductDetails = asyncHandler(async (req, res) => {
 
 module.exports = {
     getAllpurchasePlansbyUser,
-    createPlanDeliveryOrder,
+    createPlanDeliveryOrderOnVelocity,
     getproductDetails
 };

@@ -66,7 +66,8 @@ const planDeliverySchema = new mongoose.Schema(
                 "shipped",
                 "delivered",
                 "cancelled",
-                "returned"
+                "returned",
+                "confirmed",
             ],
             default: "pending"
         },

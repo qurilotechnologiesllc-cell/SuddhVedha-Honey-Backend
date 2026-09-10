@@ -113,7 +113,8 @@ const orderGroupSchema = new mongoose.Schema({
             'failed',
             'refunded',
             'partially_refunded',
-            'cancelled'
+            'cancelled',
+            'paid'
         ],
         default: 'pending',
         index: true
