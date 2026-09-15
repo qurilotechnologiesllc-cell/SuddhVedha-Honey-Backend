@@ -160,20 +160,70 @@ const orderSchema = new mongoose.Schema({
             'failed',
             'refunded',
             'partially_refunded',
-            'cancelled'
+            'cancelled',
+            'paid',
+            'refund_failed'
         ],
         default: 'pending',
         index: true
     },
 
-    // ─────────────────────────────────────────
-    // Payment Details
-    // ─────────────────────────────────────────
 
-    payment: {
-        type: mongoose.Schema.Types.Mixed,
-        default: {}
-    },
+    refunds: [
+        {
+            razorpay_refund_id: {
+                type: String,
+                index: true
+            },
+
+            razorpay_payment_id: {
+                type: String
+            },
+
+            amount: {
+                type: Number,
+                required: true
+            },
+
+            currency: {
+                type: String,
+                default: "INR"
+            },
+
+            status: {
+                type: String,
+                enum: [
+                    "pending",
+                    "processed",
+                    "failed",
+                    "reversed"
+                ],
+                default: "pending"
+            },
+
+            reason: {
+                type: String,
+                default: null
+            },
+
+            initiatedAt: {
+                type: Date
+            },
+
+            processedAt: {
+                type: Date
+            },
+
+            failedAt: {
+                type: Date
+            },
+
+            acquirer_data: {
+                type: mongoose.Schema.Types.Mixed,
+                default: null
+            }
+        }
+    ],
 
 
     // ─────────────────────────────────────────

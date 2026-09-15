@@ -3,6 +3,7 @@ const Ordergroup = require('../models/orderGoup.model')
 const User = require('../models/user.model')
 const Offers = require('../models/offer.model')
 const CouponUsage = require('../models/couponUsage.model')
+const ProductVariant = require('../models/productVariant.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
@@ -10,6 +11,7 @@ const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCa
 const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/stockService');
 const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders');
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler');
+const updateOrderGroupRefundSummary = require('../helpers/updateOrderGroupRefundSummary')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
@@ -852,13 +854,6 @@ const createOrderByUser = asyncHandler(async (req, res) => {
                 payment_status:
                     "pending",
 
-                payment: {
-
-                    razorpay_order_id:
-                        razorpayOrder.id
-
-                },
-
                 order_status:
                     "processing",
 
@@ -1056,6 +1051,7 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
     const formattedOrders = orders.map(order => ({
 
         // ── Order Info ────────────────────────────
+        _id: order._id,
         order_id: order.order_id,
         order_status: order.order_status,
         order_date: order.createdAt,
@@ -1132,17 +1128,6 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
     const rawBody = req.rawBody;
 
 
-    console.log(
-        "Is Buffer:",
-        Buffer.isBuffer(rawBody)
-    );
-
-
-    console.log(
-        "Raw Webhook Body:",
-        rawBody
-    );
-
 
     if (!rawBody) {
         return res.status(400).json({
@@ -1185,12 +1170,6 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     }
 
-
-    console.log(
-        "✅ Razorpay signature verified"
-    );
-
-
     // Parse ONLY after signature verification
     const webhookData =
         JSON.parse(
@@ -1204,14 +1183,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
     );
 
 
-    const event =
-        webhookData.event;
-
-
-    console.log(
-        "Razorpay Event data:",
-        event
-    );
+    const event = webhookData.event;
 
 
     console.log(webhookData?.payload?.payment?.entity)
@@ -1737,7 +1709,366 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             break;
         }
 
+        case "refund.created": {
 
+            const refund =
+                webhookData
+                    ?.payload
+                    ?.refund
+                    ?.entity;
+
+
+            if (!refund) {
+                break;
+            }
+
+
+            console.log(
+                "Refund created:",
+                refund.id
+            );
+
+
+            const order =
+                await Order.findOne({
+                    "refunds.razorpay_refund_id":
+                        refund.id
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found for refund:",
+                    refund.id
+                );
+
+                break;
+            }
+
+
+            const refundIndex =
+                order.refunds.findIndex(
+                    item =>
+                        item.razorpay_refund_id ===
+                        refund.id
+                );
+
+
+            if (refundIndex === -1) {
+                break;
+            }
+
+
+            // Update refund information
+
+            order.refunds[refundIndex].status =
+                refund.status || "pending";
+
+            order.refunds[refundIndex].amount =
+                refund.amount / 100;
+
+            order.refunds[refundIndex].currency =
+                refund.currency || "INR";
+
+            order.refunds[refundIndex].acquirer_data =
+                refund.acquirer_data || null;
+
+
+            // Optional: save complete webhook
+            order.refunds[refundIndex].webhook_payload =
+                webhookData;
+
+
+            await order.save();
+
+
+            console.log(
+                `Refund created updated for order: ${order.order_id}`
+            );
+
+
+            break;
+        }
+
+        case "refund.processed": {
+
+            const refund =
+                webhookData
+                    ?.payload
+                    ?.refund
+                    ?.entity;
+
+
+            if (!refund) {
+                break;
+            }
+
+
+            console.log(
+                "Refund processed:",
+                refund.id
+            );
+
+
+            const order =
+                await Order.findOne({
+                    "refunds.razorpay_refund_id":
+                        refund.id
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found for processed refund:",
+                    refund.id
+                );
+
+                break;
+            }
+
+
+            const refundIndex =
+                order.refunds.findIndex(
+                    item =>
+                        item.razorpay_refund_id ===
+                        refund.id
+                );
+
+
+            if (refundIndex === -1) {
+                break;
+            }
+
+
+            // ─────────────────────────────────────────
+            // Check duplicate webhook
+            // ─────────────────────────────────────────
+
+            const alreadyProcessed =
+                order.refunds[refundIndex].status ===
+                "processed";
+
+
+            // ─────────────────────────────────────────
+            // Update refund
+            // ─────────────────────────────────────────
+
+            order.refunds[refundIndex].status =
+                "processed";
+
+            order.refunds[refundIndex].amount =
+                refund.amount / 100;
+
+            order.refunds[refundIndex].currency =
+                refund.currency || "INR";
+
+            order.refunds[refundIndex].processedAt =
+                new Date();
+
+            order.refunds[refundIndex].acquirer_data =
+                refund.acquirer_data || null;
+
+            order.refunds[refundIndex].webhook_payload =
+                webhookData;
+
+
+            // ─────────────────────────────────────────
+            // Update Order
+            // ─────────────────────────────────────────
+
+            order.payment_status =
+                "refunded";
+
+            order.order_status = "refunded";
+
+
+            await order.save();
+
+
+            // ─────────────────────────────────────────
+            // Update OrderGroup
+            // ─────────────────────────────────────────
+
+            await updateOrderGroupRefundSummary(
+                order.order_group_id
+            );
+
+
+            console.log(
+                `Refund processed for order: ${order.order_id}`
+            );
+
+
+            break;
+        }
+
+        case "refund.failed": {
+
+            const refund =
+                webhookData
+                    ?.payload
+                    ?.refund
+                    ?.entity;
+
+
+            if (!refund) {
+                break;
+            }
+
+
+            const order =
+                await Order.findOne({
+                    "refunds.razorpay_refund_id":
+                        refund.id
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found for failed refund:",
+                    refund.id
+                );
+
+                break;
+            }
+
+
+            const refundIndex =
+                order.refunds.findIndex(
+                    item =>
+                        item.razorpay_refund_id ===
+                        refund.id
+                );
+
+
+            if (refundIndex === -1) {
+                break;
+            }
+
+
+            order.refunds[refundIndex].status =
+                "failed";
+
+            order.refunds[refundIndex].failedAt =
+                new Date();
+
+            order.refunds[refundIndex].acquirer_data =
+                refund.acquirer_data || null;
+
+            order.refunds[refundIndex].webhook_payload =
+                webhookData;
+
+
+            // Refund failed.
+            // Order was cancelled but money was NOT refunded.
+
+            order.payment_status =
+                "paid";
+
+            order.order_status =
+                "cancelled";
+
+
+            await order.save();
+
+
+            // Recalculate group summary
+
+            await updateOrderGroupRefundSummary(
+                order.order_group_id
+            );
+
+
+            console.log(
+                `Refund failed for order: ${order.order_id}`
+            );
+
+
+            break;
+        }
+
+        case "refund.reversed": {
+
+            const refund =
+                webhookData
+                    ?.payload
+                    ?.refund
+                    ?.entity;
+
+
+            if (!refund) {
+                break;
+            }
+
+
+            const order =
+                await Order.findOne({
+                    "refunds.razorpay_refund_id":
+                        refund.id
+                });
+
+
+            if (!order) {
+
+                console.error(
+                    "Order not found for reversed refund:",
+                    refund.id
+                );
+
+                break;
+            }
+
+
+            const refundIndex =
+                order.refunds.findIndex(
+                    item =>
+                        item.razorpay_refund_id ===
+                        refund.id
+                );
+
+
+            if (refundIndex === -1) {
+                break;
+            }
+
+
+            order.refunds[refundIndex].status =
+                "reversed";
+
+            order.refunds[refundIndex].acquirer_data =
+                refund.acquirer_data || null;
+
+            order.refunds[refundIndex].webhook_payload =
+                webhookData;
+
+
+            // Refund is no longer successful
+
+            order.payment_status =
+                "paid";
+
+            order.order_status =
+                "cancelled";
+
+
+            await order.save();
+
+
+            await updateOrderGroupRefundSummary(
+                order.order_group_id
+            );
+
+
+            console.log(
+                `Refund reversed for order: ${order.order_id}`
+            );
+
+
+            break;
+        }
         /*
         |--------------------------------------------------------------------------
         | UNKNOWN EVENT
@@ -1768,8 +2099,204 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
 });
 
+const CANCELLABLE_STATUSES = ["pending", "processing"];
+
+const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
+
+    const userId = req.user.id;
+    const { orderId } = req.params;
+
+    const order = await Order.findOne({
+        _id: orderId,
+        userId
+    }).exec();
+
+    if (!order) {
+        throw new NotFoundError("Order not found.");
+    }
+
+    if (!CANCELLABLE_STATUSES.includes(order.order_status)) {
+        throw new BadRequestError(
+            `Order cannot be cancelled. Current status: ${order.order_status}`
+        );
+    }
+
+    const orderGroup = await Ordergroup
+        .findById(order.order_group_id)
+        .exec();
+
+    if (!orderGroup) {
+        throw new NotFoundError("Order group not found.");
+    }
+
+
+    // ─────────────────────────────────────────
+    // 1. RELEASE RESERVED STOCK
+    // ─────────────────────────────────────────
+
+    await Promise.all(
+        order.items.map(async (item) => {
+
+            const productId =
+                item.product_details.product._id;
+
+            const variantId =
+                item.product_details.product.variant._id;
+
+            const reservedQty =
+                item.reserved_quantity;
+
+            if (!reservedQty) return;
+
+            await ProductVariant.updateOne(
+                {
+                    product: productId,
+                    "variants._id": variantId
+                },
+                {
+                    $inc: {
+                        "variants.$[v].available_stock":
+                            reservedQty
+                    }
+                },
+                {
+                    arrayFilters: [
+                        {
+                            "v._id": variantId
+                        }
+                    ]
+                }
+            );
+
+            item.reserved_quantity = 0;
+        })
+    );
+
+
+    order.inventory_status = "released";
+
+    await order.save();
+
+
+    // ─────────────────────────────────────────
+    // 3. REFUND
+    // ─────────────────────────────────────────
+
+    let refundResult = null;
+
+    if (
+        orderGroup.payment_mode !== "cod" &&
+        orderGroup.payment?.razorpay_payment_id
+    ) {
+
+        // Cancelled order ka actual refundable amount
+        const refundAmount =
+            Number(order.totalAmount) * 100;
+
+
+        refundResult =
+            await razorpay.payments.refund(
+                orderGroup.payment.razorpay_payment_id,
+                {
+                    amount: refundAmount,
+
+                    speed: "normal",
+
+                    notes: {
+                        reason:
+                            "Order cancelled before shipment",
+
+                        order_id:
+                            String(order._id),
+
+                        order_number:
+                            order.order_id,
+
+                        group_id:
+                            String(orderGroup._id),
+
+                        group_number:
+                            orderGroup.group_id
+                    }
+                }
+            );
+
+
+        // Save Razorpay refund transaction
+        order.refunds.push({
+
+            razorpay_refund_id:
+                refundResult.id,
+
+            razorpay_payment_id:
+                orderGroup.payment.razorpay_payment_id,
+
+            amount:
+                refundResult.amount / 100,
+
+            currency:
+                refundResult.currency || "INR",
+
+            status:
+                refundResult.status,
+
+            reason:
+                "Order cancelled before shipment",
+
+            initiatedAt:
+                new Date(),
+
+            processedAt:
+                refundResult.status === "processed"
+                    ? new Date()
+                    : null,
+
+            acquirer_data:
+                refundResult.acquirer_data || null
+        });
+
+
+        // Only mark refunded if Razorpay
+        // has actually processed it
+        if (
+            refundResult.status === "processed"
+        ) {
+            order.payment_status = "refunded";
+            order.order_status = "cancelled";
+        }
+
+
+        await order.save();
+    }
+
+    res.status(200).json({
+
+        success: true,
+
+        message:
+            "Order cancelled successfully",
+
+        data: {
+
+            cancelled_order:
+                order.order_id,
+
+            refund: refundResult
+                ? {
+                    id: refundResult.id,
+                    amount:
+                        refundResult.amount / 100,
+                    status:
+                        refundResult.status
+                }
+                : null
+        }
+    });
+});
+
 module.exports = {
     createOrderByUser,
     getMyordersDetails,
-    razorpayWebhooks
+    razorpayWebhooks,
+    cancelSingleOrderByUser,
 }

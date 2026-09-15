@@ -147,7 +147,46 @@ const orderGroupSchema = new mongoose.Schema({
         wallet: String,
 
         acquirer_data: mongoose.Schema.Types.Mixed
-    }
+    },
+
+    refund_status: {
+        type: String,
+        enum: [
+            "none",
+            "pending",
+            "partially_refunded",
+            "refunded"
+        ],
+        default: "none",
+        index: true
+    },
+
+    total_refunded_amount: {
+        type: Number,
+        default: 0
+    },
+
+    remaining_amount: {
+        type: Number,
+        default: 0
+    },
+
+    refund_count: {
+        type: Number,
+        default: 0
+    },
+
+    refunded_order_count: {
+        type: Number,
+        default: 0
+    },
+
+    refunded_order_ids: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Order"
+        }
+    ],
 
 }, {
     timestamps: true
