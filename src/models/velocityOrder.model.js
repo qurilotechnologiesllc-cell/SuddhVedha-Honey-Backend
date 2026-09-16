@@ -74,6 +74,14 @@ const velocityOrderSchema = new mongoose.Schema(
             default: null,
         },
 
+        tracking: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {
+                current: null,
+                history: [],
+            },
+        },
+
         // Useful for our own integration state
         status: {
             type: String,

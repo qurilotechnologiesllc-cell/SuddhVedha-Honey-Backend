@@ -4,6 +4,7 @@ const User = require('../models/user.model')
 const Offers = require('../models/offer.model')
 const CouponUsage = require('../models/couponUsage.model')
 const ProductVariant = require('../models/productVariant.model')
+const VelocitySchema = require('../models/velocityOrder.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
@@ -1034,7 +1035,7 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
     // ─── Orders Fetch karo userId se ─────────────
     const orders = await Order.find({ userId: id })
         .select(
-            'order_id items finalAmount shipping_address payment_mode payment_status order_status createdAt'
+            'order_id order_group_id items finalAmount shipping_address payment_mode payment_status order_status createdAt'
         )
         .sort({ createdAt: -1 }) // ← Latest pehle
 
@@ -1052,6 +1053,7 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
 
         // ── Order Info ────────────────────────────
         _id: order._id,
+        order_group_id: order.order_group_id,
         order_id: order.order_id,
         order_status: order.order_status,
         order_date: order.createdAt,
@@ -2510,9 +2512,67 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
     });
 });
 
+const getliveTrackingDetails = asyncHandler(async (req, res) => {
+    const { ordergroupId } = req.params;
+
+    const userId = req.user.id;
+
+    // -----------------------------------------
+    // 1. Validate OrderGroup
+    // -----------------------------------------
+
+    const orderGroup = await Ordergroup.findOne({
+        _id: ordergroupId,
+        userId: userId,
+    }).select("_id");
+
+    if (!orderGroup) {
+        return res.status(404).json({
+            success: false,
+            message: "Order group not found",
+        });
+    }
+
+    // -----------------------------------------
+    // 2. Find Velocity shipment
+    // -----------------------------------------
+
+    const velocityOrder = await VelocitySchema.findOne({
+        orderGroupId: orderGroup._id,
+    })
+        .select(
+            "awbCode shipmentId courierName tracking.current"
+        )
+        .lean();
+
+    if (!velocityOrder) {
+        return res.status(404).json({
+            success: false,
+            message:
+                "Velocity shipment tracking details not found",
+        });
+    }
+
+    // -----------------------------------------
+    // 3. Return tracking details
+    // -----------------------------------------
+
+    return res.status(200).json({
+        success: true,
+        message: "Live tracking details fetched successfully",
+        data: {
+            awbCode: velocityOrder.awbCode,
+            shipmentId: velocityOrder.shipmentId,
+            courierName: velocityOrder.courierName,
+            tracking: velocityOrder.tracking?.current || null,
+        },
+    });
+});
+
 module.exports = {
     createOrderByUser,
     getMyordersDetails,
     razorpayWebhooks,
     cancelSingleOrderByUser,
+    getliveTrackingDetails
 }

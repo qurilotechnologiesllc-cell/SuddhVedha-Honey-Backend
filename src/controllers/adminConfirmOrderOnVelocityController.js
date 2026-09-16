@@ -510,7 +510,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
 
       orderSummary: {
 
-        totalOrders:activeOrders.length,
+        totalOrders: activeOrders.length,
 
         activeOrders:
           activeOrders.length,
@@ -552,10 +552,301 @@ const cancelOrderByAdmin = asyncHandler(async (req, res) => {
   }
 
   const velocityOrder = await VelocitySchema.findOne({ orderGroupId });
-})
+});
+
+const orderTrackingByVelocityWebhooks = asyncHandler(
+  async (req, res) => {
+    try {
+      const webhookData = req.body;
+
+      console.log(
+        "========== VELOCITY WEBHOOK =========="
+      );
+
+      console.log(
+        JSON.stringify(webhookData, null, 2)
+      );
+
+      const {
+        event,
+        event_id,
+        data,
+      } = webhookData;
+
+      // -----------------------------------------
+      // 1. Basic payload validation
+      // -----------------------------------------
+
+      if (!event || !event_id || !data) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Velocity webhook payload",
+        });
+      }
+
+      const {
+        shipment_id,
+        tracking_number,
+        order_id,
+        order_external_id,
+        status: velocityStatus,
+      } = data;
+
+      if (
+        !shipment_id &&
+        !tracking_number &&
+        !order_id &&
+        !order_external_id
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Shipment ID, AWB, order ID or external order ID is required",
+        });
+      }
+
+      if (!velocityStatus) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Shipment status is missing from Velocity webhook",
+        });
+      }
+
+      // -----------------------------------------
+      // 2. Find VelocityOrder
+      // -----------------------------------------
+
+      let velocityOrder = null;
+
+      const maxAttempts = 5;
+      const retryDelay = 500;
+
+      for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+      ) {
+        const conditions = [];
+
+        if (shipment_id) {
+          conditions.push({
+            shipmentId: shipment_id,
+          });
+        }
+
+        if (tracking_number) {
+          conditions.push({
+            awbCode: tracking_number,
+          });
+        }
+
+        if (order_id) {
+          conditions.push({
+            velocityOrderId: order_id,
+          });
+        }
+
+        if (order_external_id) {
+          conditions.push({
+            merchantOrderId: order_external_id,
+          });
+        }
+
+        velocityOrder =
+          await VelocitySchema.findOne({
+            $or: conditions,
+          });
+
+        if (velocityOrder) {
+          console.log(
+            `Velocity shipment found on attempt ${attempt}`
+          );
+
+          break;
+        }
+
+        console.log(
+          `Velocity shipment not found. Attempt ${attempt}/${maxAttempts}`
+        );
+
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryDelay)
+          );
+        }
+      }
+
+      // -----------------------------------------
+      // 3. VelocityOrder not found
+      // -----------------------------------------
+
+      if (!velocityOrder) {
+        console.warn(
+          "Velocity shipment not found after retries",
+          {
+            shipment_id,
+            tracking_number,
+            order_id,
+            order_external_id,
+          }
+        );
+
+        return res.status(200).json({
+          success: true,
+          message:
+            "Webhook received but shipment was not available yet",
+        });
+      }
+
+      // -----------------------------------------
+      // 4. Initialize tracking
+      // -----------------------------------------
+
+      if (!velocityOrder.tracking) {
+        velocityOrder.tracking = {
+          current: null,
+          history: [],
+        };
+      }
+
+      if (!velocityOrder.tracking.history) {
+        velocityOrder.tracking.history = [];
+      }
+
+      // -----------------------------------------
+      // 5. Prevent duplicate webhook
+      // -----------------------------------------
+
+      const alreadyProcessed =
+        velocityOrder.tracking.history.some(
+          (trackingEvent) =>
+            trackingEvent.event_id === event_id
+        );
+
+      if (alreadyProcessed) {
+        console.log(
+          `Duplicate Velocity webhook ignored: ${event_id}`
+        );
+
+        return res.status(200).json({
+          success: true,
+          message:
+            "Webhook already processed",
+        });
+      }
+
+      // -----------------------------------------
+      // 6. Create complete tracking event
+      // -----------------------------------------
+
+      const trackingEvent = {
+        ...webhookData,
+        received_at: new Date(),
+      };
+
+      // -----------------------------------------
+      // 7. Update current tracking
+      // -----------------------------------------
+
+      velocityOrder.tracking.current =
+        trackingEvent;
+
+      // -----------------------------------------
+      // 8. Add tracking history
+      // -----------------------------------------
+
+      velocityOrder.tracking.history.push(
+        trackingEvent
+      );
+
+      velocityOrder.markModified("tracking");
+
+      // -----------------------------------------
+      // 9. Save Velocity tracking
+      // -----------------------------------------
+
+      await velocityOrder.save();
+
+      // =================================================
+      // 10. UPDATE ORDER STATUS
+      // =================================================
+
+      const orderIds = velocityOrder.orderIds || [];
+
+      if (orderIds.length > 0) {
+
+        const orderUpdateResult =
+          await Order.updateMany(
+            {
+              _id: {
+                $in: orderIds,
+              },
+            },
+            {
+              $set: {
+                order_status:
+                  velocityStatus,
+              },
+            }
+          );
+
+        console.log(
+          "Order status updated:",
+          {
+            status: velocityStatus,
+            orderIds,
+            matchedCount:
+              orderUpdateResult.matchedCount,
+            modifiedCount:
+              orderUpdateResult.modifiedCount,
+          }
+        );
+      } else {
+        console.warn(
+          "No orderIds found in VelocityOrder",
+          {
+            velocityOrderId:
+              velocityOrder.velocityOrderId,
+            shipmentId:
+              velocityOrder.shipmentId,
+          }
+        );
+      }
+      // -----------------------------------------
+      // 12. Success response
+      // -----------------------------------------
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Velocity tracking webhook processed successfully",
+        data: {
+          event,
+          status: velocityStatus,
+          orderIds,
+        },
+      });
+
+    } catch (error) {
+
+      console.error(
+        "Velocity Tracking Webhook Error:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Velocity webhook processing failed",
+      });
+    }
+  }
+);
 
 module.exports = {
   checkdeliveryavailability,
   checkDeliveryAvailabilitybyAdmin,
   creareOrderByAdmin,
+  orderTrackingByVelocityWebhooks
 };

@@ -36,7 +36,7 @@ const SubscripationsPlans = require('./routes/plansRoute.js');
 const adminOrderDashboardRoutes = require('./routes/adminOrderDashboardRoute.js');
 
 // Order Services
-const velocityOrderServiceRoute = require('./routes/velocityOrderServiceRoute.js');
+const adminConfirmOrderOnVelocity = require('./routes/adminConfirmOrderOnVelocityRoute.js');
 
 app.use(
   express.json({
@@ -129,7 +129,7 @@ app.use('/api/admin/plan-orders', adminPlanOrdersRoute);
 app.use('/api/admin/order-dashboard', adminOrderDashboardRoutes);
 
 // Order Services
-app.use('/api/order-service', velocityOrderServiceRoute);
+app.use('/api/order-service', adminConfirmOrderOnVelocity);
 
 // Error handling middleware must be registered after all routes.
 app.use(notFoundHandler);
