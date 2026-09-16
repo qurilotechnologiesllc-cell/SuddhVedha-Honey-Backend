@@ -1779,6 +1779,9 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             order.refunds[refundIndex].webhook_payload =
                 webhookData;
 
+            order.payment_status =
+                "refund_pending";
+
 
             await order.save();
 
@@ -1881,7 +1884,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             order.payment_status =
                 "refunded";
 
-            order.order_status = "refunded";
+            order.order_status = "cancelled";
 
 
             await order.save();
@@ -1965,8 +1968,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             // Refund failed.
             // Order was cancelled but money was NOT refunded.
 
-            order.payment_status =
-                "paid";
+            order.payment_status = "refund_failed";
 
             order.order_status =
                 "cancelled";
@@ -2048,7 +2050,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             // Refund is no longer successful
 
             order.payment_status =
-                "paid";
+                "refund_reversed";
 
             order.order_status =
                 "cancelled";
@@ -2106,6 +2108,11 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
     const userId = req.user.id;
     const { orderId } = req.params;
 
+
+    // ─────────────────────────────────────────
+    // 1. FIND ORDER
+    // ─────────────────────────────────────────
+
     const order = await Order.findOne({
         _id: orderId,
         userId
@@ -2115,26 +2122,39 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
         throw new NotFoundError("Order not found.");
     }
 
+
+    // ─────────────────────────────────────────
+    // 2. CHECK ORDER STATUS
+    // ─────────────────────────────────────────
+
     if (!CANCELLABLE_STATUSES.includes(order.order_status)) {
         throw new BadRequestError(
             `Order cannot be cancelled. Current status: ${order.order_status}`
         );
     }
 
+
+    // ─────────────────────────────────────────
+    // 3. FIND ORDER GROUP
+    // ─────────────────────────────────────────
+
     const orderGroup = await Ordergroup
         .findById(order.order_group_id)
         .exec();
 
     if (!orderGroup) {
-        throw new NotFoundError("Order group not found.");
+        throw new NotFoundError(
+            "Order group not found."
+        );
     }
 
 
     // ─────────────────────────────────────────
-    // 1. RELEASE RESERVED STOCK
+    // 4. RELEASE RESERVED STOCK
     // ─────────────────────────────────────────
 
     await Promise.all(
+
         order.items.map(async (item) => {
 
             const productId =
@@ -2146,7 +2166,11 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
             const reservedQty =
                 item.reserved_quantity;
 
-            if (!reservedQty) return;
+
+            if (!reservedQty) {
+                return;
+            }
+
 
             await ProductVariant.updateOne(
                 {
@@ -2168,6 +2192,7 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
                 }
             );
 
+
             item.reserved_quantity = 0;
         })
     );
@@ -2175,21 +2200,168 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
 
     order.inventory_status = "released";
 
-    await order.save();
-
 
     // ─────────────────────────────────────────
-    // 3. REFUND
+    // 5. COD / ONLINE PAYMENT
     // ─────────────────────────────────────────
 
     let refundResult = null;
 
-    if (
-        orderGroup.payment_mode !== "cod" &&
+
+    // ═══════════════════════════════════════════
+    // COD ORDER
+    // ═══════════════════════════════════════════
+
+    if (orderGroup.payment_mode === "cod") {
+
+
+        // ---------------------------------------
+        // Cancel order first
+        // ---------------------------------------
+
+        order.order_status = "cancelled";
+
+        // COD payment abhi hua hi nahi hai
+        order.payment_status = "pending";
+
+
+        await order.save();
+
+
+        // ---------------------------------------
+        // Recalculate group amount
+        // ---------------------------------------
+
+        const remainingOrders =
+            await Order.find({
+                order_group_id:
+                    orderGroup._id,
+
+                order_status: {
+                    $nin: [
+                        "cancelled",
+                        "refunded"
+                    ]
+                }
+            })
+                .select("totalAmount")
+                .lean();
+
+
+        // ---------------------------------------
+        // Remaining products total
+        // ---------------------------------------
+
+        const newTotalAmount =
+            remainingOrders.reduce(
+                (total, remainingOrder) =>
+                    total +
+                    Number(
+                        remainingOrder.totalAmount || 0
+                    ),
+                0
+            );
+
+
+        // ---------------------------------------
+        // Calculate COD
+        //
+        // Existing COD percentage:
+        // 187 / 748 = 25%
+        // ---------------------------------------
+
+        const oldTotalAmount =
+            Number(
+                orderGroup.totalAmount || 0
+            );
+
+        const oldCodAmount =
+            Number(
+                orderGroup.cod_amount || 0
+            );
+
+
+        let codPercentage = 0;
+
+
+        if (oldTotalAmount > 0) {
+
+            codPercentage =
+                oldCodAmount /
+                oldTotalAmount;
+        }
+
+
+        // ---------------------------------------
+        // New COD amount
+        // ---------------------------------------
+
+        const newCodAmount =
+            Math.round(
+                newTotalAmount *
+                codPercentage
+            );
+
+
+        // ---------------------------------------
+        // New final amount
+        // ---------------------------------------
+
+        const newFinalAmount =
+            newTotalAmount +
+            newCodAmount;
+
+
+        // ---------------------------------------
+        // Update OrderGroup
+        // ---------------------------------------
+
+        orderGroup.totalAmount =
+            newTotalAmount;
+
+        orderGroup.cod_amount =
+            newCodAmount;
+
+        orderGroup.finalAmount =
+            newFinalAmount;
+
+
+        // COD order mein refund nahi hai
+        orderGroup.refund_status =
+            "none";
+
+        orderGroup.total_refunded_amount =
+            0;
+
+        orderGroup.remaining_amount =
+            0;
+
+        orderGroup.refund_count =
+            0;
+
+        orderGroup.refunded_order_count =
+            0;
+
+        orderGroup.refunded_order_ids =
+            [];
+
+
+        await orderGroup.save();
+
+
+        // ═══════════════════════════════════════════
+        // ONLINE PAYMENT
+        // ═══════════════════════════════════════════
+
+    } else if (
         orderGroup.payment?.razorpay_payment_id
     ) {
 
-        // Cancelled order ka actual refundable amount
+
+        // ---------------------------------------
+        // Refund only cancelled order amount
+        // ---------------------------------------
+
         const refundAmount =
             Number(order.totalAmount) * 100;
 
@@ -2203,6 +2375,7 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
                     speed: "normal",
 
                     notes: {
+
                         reason:
                             "Order cancelled before shipment",
 
@@ -2222,7 +2395,10 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
             );
 
 
-        // Save Razorpay refund transaction
+        // ---------------------------------------
+        // Save refund transaction
+        // ---------------------------------------
+
         order.refunds.push({
 
             razorpay_refund_id:
@@ -2256,20 +2432,40 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
         });
 
 
-        // Only mark refunded if Razorpay
-        // has actually processed it
+        // ---------------------------------------
+        // Update payment status
+        // ---------------------------------------
+
         if (
             refundResult.status === "processed"
         ) {
-            order.payment_status = "refunded";
-            order.order_status = "cancelled";
+
+            order.payment_status =
+                "refunded";
+
+        } else if (
+            refundResult.status === "pending"
+        ) {
+
+            order.payment_status =
+                "refund_pending";
         }
+
+
+        // Order status always cancelled
+        order.order_status =
+            "cancelled";
 
 
         await order.save();
     }
 
-    res.status(200).json({
+
+    // ─────────────────────────────────────────
+    // 6. RESPONSE
+    // ─────────────────────────────────────────
+
+    return res.status(200).json({
 
         success: true,
 
@@ -2281,15 +2477,35 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
             cancelled_order:
                 order.order_id,
 
-            refund: refundResult
-                ? {
-                    id: refundResult.id,
-                    amount:
-                        refundResult.amount / 100,
-                    status:
-                        refundResult.status
-                }
-                : null
+            payment_mode:
+                orderGroup.payment_mode,
+
+            refund:
+                refundResult
+                    ? {
+                        id:
+                            refundResult.id,
+
+                        amount:
+                            refundResult.amount / 100,
+
+                        status:
+                            refundResult.status
+                    }
+                    : null,
+
+            // Useful especially for COD
+            orderGroup: {
+
+                totalAmount:
+                    orderGroup.totalAmount,
+
+                cod_amount:
+                    orderGroup.cod_amount,
+
+                finalAmount:
+                    orderGroup.finalAmount
+            }
         }
     });
 });

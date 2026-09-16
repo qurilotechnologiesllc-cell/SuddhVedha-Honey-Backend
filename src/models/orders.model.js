@@ -162,6 +162,8 @@ const orderSchema = new mongoose.Schema({
             'partially_refunded',
             'cancelled',
             'paid',
+            'refund_pending',
+            'refund_reversed',
             'refund_failed'
         ],
         default: 'pending',
@@ -240,7 +242,6 @@ const orderSchema = new mongoose.Schema({
             'delivered',
             'cancelled',
             'returned',
-            'refunded',
             'confirmed'
         ],
         default: 'pending',

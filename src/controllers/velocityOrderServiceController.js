@@ -66,7 +66,6 @@ const checkDeliveryAvailabilitybyAdmin = asyncHandler(async (req, res) => {
   res.status(200).json({ serviceability_results: result.serviceability_results });
 });
 
-
 const creareOrderByAdmin = asyncHandler(async (req, res) => {
   const { role } = req.user;
 
@@ -141,15 +140,18 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
   // 5. Get all orders belonging to this group
   // ---------------------------------------------------
 
-  const orders = await Order.find({
+  const activeOrders = await Order.find({
     _id: { $in: orderGroup.orderIds },
     order_group_id: orderGroup._id,
+    order_status: {
+      $nin: ["cancelled", "refunded"],
+    },
   }).lean();
 
-  if (!orders.length) {
-    return res.status(404).json({
+  if (!activeOrders.length) {
+    return res.status(400).json({
       success: false,
-      message: "No orders found in this order group",
+      message: "No active order available for Velocity.",
     });
   }
 
@@ -171,7 +173,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
   // the required address relationship.
   // ---------------------------------------------------
 
-  const firstOrder = orders[0];
+  const firstOrder = activeOrders[0];
 
   const shippingAddress = firstOrder.shipping_address;
   const billingAddress = firstOrder.billing_address;
@@ -200,14 +202,18 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
 
   const orderItems = [];
 
-  for (const order of orders) {
+
+  for (const order of activeOrders) {
     for (const item of order.items || []) {
       const productDetails = item.product_details || {};
       const product = productDetails.product || {};
       const variant = product.variant || {};
 
-      const sellingPrice =
-        Number(variant.price || productDetails.finalAmount || 0);
+      const sellingPrice = Number(
+        variant.price ||
+        productDetails.finalAmount ||
+        0
+      );
 
       const discount = Number(
         productDetails.couponDiscount || 0
@@ -215,37 +221,34 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
 
       orderItems.push({
         name: product.product_name || "Product",
-
-        // If you have a real SKU field later, use that.
         sku: String(
           variant.sku ||
           variant._id ||
           product._id ||
           item._id
         ),
-
         units: Number(item.quantity || 1),
-
         selling_price: sellingPrice,
-
-        discount: discount,
+        discount,
       });
     }
   }
 
-  // ---------------------------------------------------
-  // 10. Calculate subtotal
-  // ---------------------------------------------------
-
-  const subTotal = Number(orderGroup.finalAmount || 0);
-
-  // ---------------------------------------------------
-  // 11. Payment mode
-  // ---------------------------------------------------
-
   const paymentMode = orderGroup.payment_mode || firstOrder.payment_mode;
 
-  const codCollectible = paymentMode === "cod" ? subTotal : 0;
+  let subTotal;
+  let codCollectible;
+
+  if (paymentMode === "cod") {
+    // COD cancellation ke time OrderGroup already recalculate ho chuka hai
+    subTotal = Number(orderGroup.finalAmount || 0);
+    codCollectible = Number(orderGroup.finalAmount || 0);
+  } else {
+    // Prepaid/online
+    subTotal = Number(orderGroup.finalAmount || 0) - Number(orderGroup.total_refunded_amount || 0);
+    subTotal = Math.max(subTotal, 0);
+    codCollectible = 0;
+  }
 
   // ---------------------------------------------------
   // 12. Generate merchant order ID
@@ -393,7 +396,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
     await VelocitySchema.create({
       orderGroupId: orderGroup._id,
 
-      orderIds: orders.map((order) => order._id),
+      orderIds: activeOrders.map((order) => order._id),
 
       merchantOrderId,
 
@@ -433,7 +436,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
   const velocityOrder = await VelocitySchema.create({
     orderGroupId: orderGroup._id,
 
-    orderIds: orders.map((order) => order._id),
+    orderIds: activeOrders.map((order) => order._id),
 
     merchantOrderId,
 
@@ -477,7 +480,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
   await Order.updateMany(
     {
       _id: {
-        $in: orders.map((order) => order._id),
+        $in: activeOrders.map((order) => order._id),
       },
       order_group_id: orderGroup._id,
     },
@@ -491,21 +494,65 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
   // ---------------------------------------------------
   // 18. Return response
   // ---------------------------------------------------
-
   return res.status(201).json({
+
     success: true,
 
-    message: "Order created successfully on Velocity",
+    message:
+      "Order created successfully on Velocity",
 
     data: {
+
       velocityOrder,
 
-      velocityResponse: velocityData,
+      velocityResponse:
+        velocityData,
+
+      orderSummary: {
+
+        totalOrders:activeOrders.length,
+
+        activeOrders:
+          activeOrders.length,
+
+        activeOrderIds: activeOrders.map((order) => order._id),
+
+        subTotal: subTotal,
+
+        codCollectible: codCollectible,
+      },
     },
   });
 });
 
+const cancelOrderByAdmin = asyncHandler(async (req, res) => {
+  const { role } = req.user;
 
+  const { orderGroupId } = req.body;
+
+  if (role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Only admin can cancel Velocity order",
+    });
+  }
+
+  if (!orderGroupId) {
+    return res.status(400).json({
+      success: false,
+      message: "orderGroupId is required",
+    });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(orderGroupId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid orderGroupId",
+    });
+  }
+
+  const velocityOrder = await VelocitySchema.findOne({ orderGroupId });
+})
 
 module.exports = {
   checkdeliveryavailability,
