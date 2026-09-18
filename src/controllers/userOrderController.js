@@ -2109,8 +2109,6 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
 
     const userId = req.user.id;
     const { orderId } = req.params;
-
-
     // ─────────────────────────────────────────
     // 1. FIND ORDER
     // ─────────────────────────────────────────
@@ -2159,44 +2157,120 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
 
         order.items.map(async (item) => {
 
-            const productId =
-                item.product_details.product._id;
+            // ═════════════════════════════════════
+            // NORMAL ORDER
+            // ═════════════════════════════════════
 
-            const variantId =
-                item.product_details.product.variant._id;
+            if (item.type === "NORMAL") {
 
-            const reservedQty =
-                item.reserved_quantity;
+                const product = item.product_details?.product;
+
+                const productId = product?._id;
+
+                const variantId = product?.variant?._id;
+
+                const reservedQty = Number(item.reserved_quantity || 0);
 
 
-            if (!reservedQty) {
+                if (!productId || !variantId || reservedQty <= 0) {
+                    return;
+                }
+
+
+                await ProductVariant.updateOne(
+                    {
+                        product: productId,
+                        "variants._id": variantId
+                    },
+                    {
+                        $inc: {
+                            "variants.$[v].available_stock":
+                                reservedQty
+                        }
+                    },
+                    {
+                        arrayFilters: [
+                            {
+                                "v._id": variantId
+                            }
+                        ]
+                    }
+                );
+
+
+                // Reserved quantity release ho gayi
+                item.reserved_quantity = 0;
+
                 return;
             }
 
 
-            await ProductVariant.updateOne(
-                {
-                    product: productId,
-                    "variants._id": variantId
-                },
-                {
-                    $inc: {
-                        "variants.$[v].available_stock":
-                            reservedQty
-                    }
-                },
-                {
-                    arrayFilters: [
-                        {
-                            "v._id": variantId
+            // ═════════════════════════════════════
+            // CUSTOM ORDER
+            // ═════════════════════════════════════
+
+            if (item.type === "CUSTOM") {
+
+                const products = item.product_details?.product || [];
+
+
+                await Promise.all(
+
+                    products.map(async (customProduct) => {
+
+                        const productId = customProduct?._id;
+
+                        const variantId = customProduct?.variant?._id;
+
+                        const reservedQty = Number(customProduct.reserved_quantity ?? customProduct.quantity ?? 0);
+
+
+                        if (!productId || !variantId || reservedQty <= 0) {
+                            return;
                         }
-                    ]
-                }
-            );
 
 
-            item.reserved_quantity = 0;
+                        await ProductVariant.updateOne(
+                            {
+                                product: productId,
+                                "variants._id": variantId
+                            },
+                            {
+                                $inc: {
+                                    "variants.$[v].available_stock":
+                                        reservedQty
+                                }
+                            },
+                            {
+                                arrayFilters: [
+                                    {
+                                        "v._id": variantId
+                                    }
+                                ]
+                            }
+                        );
+
+
+                        // Agar reserved_quantity customProduct
+                        // ke andar maintain ho raha hai
+                        if (
+                            customProduct.reserved_quantity !== undefined
+                        ) {
+                            customProduct.reserved_quantity = 0;
+                        }
+
+                    })
+
+                );
+
+
+                // Agar parent CUSTOM item ke andar bhi
+                // reserved_quantity maintain ho raha hai
+                item.reserved_quantity = 0;
+            }
+
         })
+
     );
 
 
@@ -2355,9 +2429,7 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
         // ONLINE PAYMENT
         // ═══════════════════════════════════════════
 
-    } else if (
-        orderGroup.payment?.razorpay_payment_id
-    ) {
+    } else if (orderGroup.payment?.razorpay_payment_id) {
 
 
         // ---------------------------------------
