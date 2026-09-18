@@ -2211,14 +2211,14 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
 
             if (item.type === "CUSTOM") {
 
-                const products = item.product_details?.product || [];
+                const products = item.product_details?.products || [];
 
 
                 await Promise.all(
 
                     products.map(async (customProduct) => {
 
-                        const productId = customProduct?._id;
+                        const productId = customProduct?.productId;
 
                         const variantId = customProduct?.variant?._id;
 
@@ -2237,8 +2237,7 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
                             },
                             {
                                 $inc: {
-                                    "variants.$[v].available_stock":
-                                        reservedQty
+                                    "variants.$[v].available_stock": reservedQty
                                 }
                             },
                             {
