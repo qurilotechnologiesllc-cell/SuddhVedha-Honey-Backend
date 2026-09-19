@@ -555,6 +555,91 @@ const updateProductImage = asyncHandler(async (req, res) => {
 
 });
 
+const deleteProductImage = asyncHandler(async (req, res) => {
+    const { productId, imageId } = req.params;
+
+    // 1. Validate input
+    if (!productId || !imageId) {
+        return res.status(400).json({
+            success: false,
+            message: "productId and imageId are required",
+        });
+    }
+
+    // 2. Find product image document
+    const productImage = await ProductImage.findOne({
+        product: productId,
+    });
+
+    if (!productImage) {
+        return res.status(404).json({
+            success: false,
+            message: "Product image document not found",
+        });
+    }
+
+    // 3. Find image inside images array
+    const imageIndex = productImage.images.findIndex(
+        (image) => image._id.toString() === imageId.toString()
+    );
+
+    if (imageIndex === -1) {
+        return res.status(404).json({
+            success: false,
+            message: "Image not found",
+        });
+    }
+
+    // 4. Get image details
+    const imageToDelete = productImage.images[imageIndex];
+
+    const publicId = imageToDelete.public_id;
+
+    if (!publicId) {
+        return res.status(400).json({
+            success: false,
+            message: "Cloudinary public_id not found for this image",
+        });
+    }
+
+    // 5. Delete image from Cloudinary first
+    const cloudinaryResult = await deleteFromCloudinary(publicId);
+
+    // Cloudinary normally returns:
+    // { result: "ok" } -> successfully deleted
+    // { result: "not found" } -> image doesn't exist on Cloudinary
+
+    if (
+        cloudinaryResult?.result !== "ok" &&
+        cloudinaryResult?.result !== "not found"
+    ) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete image from Cloudinary",
+            cloudinaryResult,
+        });
+    }
+
+    // 6. Remove image from MongoDB
+    productImage.images.splice(imageIndex, 1);
+
+    // 7. If deleted image was primary,
+    // make first remaining image primary
+    if (imageToDelete.is_primary && productImage.images.length > 0) {
+        productImage.images.forEach((image, index) => {
+            image.is_primary = index === 0;
+        });
+    }
+
+    // 8. Save updated document
+    await productImage.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Product image deleted successfully",
+    });
+});
+
 const createProductVariant = asyncHandler(async (req, res) => {
 
     const { id } = req.params;
@@ -1173,6 +1258,7 @@ module.exports = {
     uploadProductImages,
     createProductVariant,
     updateProductImage,
+    deleteProductImage,
     updateProductVariant,
     updateProductStock,
     removeProductByAdmin

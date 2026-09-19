@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { createProduct, getAllProducts, getProductsByPagination, getAllProductByweight, getProductById, uploadProductImages, createProductVariant, updateProductImage, updateProductVariant, updateProductStock, removeProductByAdmin } = require('../controllers/productController')
+const { createProduct, getAllProducts, getProductsByPagination, getAllProductByweight, getProductById, uploadProductImages, deleteProductImage, createProductVariant, updateProductImage, updateProductVariant, updateProductStock, removeProductByAdmin } = require('../controllers/productController')
 const { uploadMultiple, uploadSingle } = require('../middlewares/upload.middleware')
 const { authMiddleware } = require('../middlewares/authmiddleware')
 
@@ -23,6 +23,8 @@ router.post('/:id/images', uploadMultiple, uploadProductImages)
 
 // Route to update a product image
 router.put('/:productId/images/:imageId', uploadSingle, updateProductImage)
+
+router.delete('/:productId/images/:imageId', deleteProductImage,)
 
 // Route to create a product variant
 router.post('/:id/variants', createProductVariant)
