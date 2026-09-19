@@ -394,6 +394,65 @@ const getProductById = asyncHandler(async (req, res) => {
     });
 });
 
+const updateproductInformation = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+
+    // Fields that admin is allowed to update
+    const allowedFields = [
+        "product_name",
+        "brand",
+        "product_type",
+        "floral_source",
+        "description",
+        "key_benefits",
+        "ingredients",
+        "manufacturer_information",
+        "shelf_life",
+        "storage_instructions",
+        "country_of_origin",
+        "fssai_license_number",
+        "batch_number",
+    ];
+
+    // Build update object only with allowed fields
+    const updateData = {};
+
+    for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+            updateData[field] = req.body[field];
+        }
+    }
+
+    // Nothing to update
+    if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Please provide at least one field to update",
+        });
+    }
+
+    // Find product
+    const product = await Product.findById(productId);
+
+    if (!product) {
+        return res.status(404).json({
+            success: false,
+            message: "Product not found",
+        });
+    }
+
+    // Update only provided fields
+    Object.assign(product, updateData);
+
+    await product.save();
+
+    return res.status(200).json({
+        success: true,
+        message: "Product information updated successfully",
+        data: product,
+    });
+});
+
 const uploadProductImages = asyncHandler(async (req, res) => {
 
     if (!req.files || req.files.length === 0) {
@@ -1255,6 +1314,7 @@ module.exports = {
     getProductsByPagination,
     getAllProductByweight,
     getProductById,
+    updateproductInformation,
     uploadProductImages,
     createProductVariant,
     updateProductImage,

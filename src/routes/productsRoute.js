@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const { createProduct, getAllProducts, getProductsByPagination, getAllProductByweight, getProductById, uploadProductImages, deleteProductImage, createProductVariant, updateProductImage, updateProductVariant, updateProductStock, removeProductByAdmin } = require('../controllers/productController')
+const { createProduct, getAllProducts, getProductsByPagination, getAllProductByweight, getProductById, updateproductInformation, uploadProductImages, deleteProductImage, createProductVariant, updateProductImage, updateProductVariant, updateProductStock, removeProductByAdmin } = require('../controllers/productController')
 const { uploadMultiple, uploadSingle } = require('../middlewares/upload.middleware')
 const { authMiddleware } = require('../middlewares/authmiddleware')
 
@@ -17,6 +17,9 @@ router.get('/weight', getAllProductByweight)
 
 // Route to get a product by ID
 router.get('/:id', getProductById)
+
+// Route to update the product info by productId
+router.patch('/update/product-information/:productId', updateproductInformation)
 
 // Route to upload product images
 router.post('/:id/images', uploadMultiple, uploadProductImages)
