@@ -81,41 +81,6 @@ const planDeliverySchema = new mongoose.Schema(
             type: Date,
             default: null
         },
-
-        shippedAt: {
-            type: Date,
-            default: null
-        },
-
-        deliveredAt: {
-            type: Date,
-            default: null
-        },
-
-
-        // ─────────────────────────────────────
-        // Shipment / Tracking
-        // ─────────────────────────────────────
-
-        tracking: {
-
-            courierName: {
-                type: String,
-                default: ""
-            },
-
-            trackingNumber: {
-                type: String,
-                default: ""
-            },
-
-            trackingUrl: {
-                type: String,
-                default: ""
-            }
-
-        }
-
     },
     {
         _id: true,

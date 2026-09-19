@@ -1082,6 +1082,18 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
                 box_image: item.product_details?.giftBox?.image,
                 products: item.product_details?.products,
                 amount: item.product_details?.totalAmount
+            }),
+
+            ...(item.type === 'PLAN' && {
+                product_name: item.product_details?.product?.product_name,
+                brand: item.product_details?.product?.brand,
+                image: item.product_details?.product?.image,
+                variant: {
+                    weight: item.product_details?.product?.variant?.weight,
+                    price: item.product_details?.product?.variant?.price,
+                    mrp: item.product_details?.product?.variant?.mrp
+                },
+                amount: item.product_details?.totalAmount
             })
         })),
 
