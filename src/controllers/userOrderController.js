@@ -5,6 +5,7 @@ const Offers = require('../models/offer.model')
 const CouponUsage = require('../models/couponUsage.model')
 const ProductVariant = require('../models/productVariant.model')
 const VelocitySchema = require('../models/velocityOrder.model')
+const Notification = require('../models/notification.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
@@ -658,6 +659,13 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         await orderGroup.save();
 
+        const notification = await Notification.create({
+            title: "New COD Order Placed",
+            message: `Order group ${orderGroup.group_id} has been placed.`,
+            notification_time: new Date(),
+            is_read: false
+        });
+
 
         /*
         |--------------------------------------------------------------------------
@@ -694,6 +702,8 @@ const createOrderByUser = asyncHandler(async (req, res) => {
                 items: order.items
             }))
         });
+
+
 
         return res.status(201).json({
 
@@ -908,6 +918,14 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
 
     await orderGroup.save();
+
+
+    const notification = await Notification.create({
+        title: "New Order Placed",
+        message: `Order group ${orderGroup.group_id} has been placed.`,
+        notification_time: new Date(),
+        is_read: false
+    });
 
     const io = getIO();
 
