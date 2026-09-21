@@ -50,6 +50,7 @@ const calculateGiftTotals = (
             variant: {
                 _id: variant._id,
                 weight: variant.weight,
+                sku: variant.sku,
                 price: variant.price,
                 mrp: variant.mrp,
                 save: variant.you_save

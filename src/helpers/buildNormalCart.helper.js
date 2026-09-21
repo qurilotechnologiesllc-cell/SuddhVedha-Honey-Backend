@@ -78,6 +78,8 @@ const buildNormalCart = (
 
                     weight: variant.weight,
 
+                    sku: variant.sku,
+
                     price: variant.price,
 
                     mrp: variant.mrp,
