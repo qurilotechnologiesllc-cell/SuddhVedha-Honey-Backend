@@ -1,6 +1,7 @@
 const Order = require('../models/orders.model')
 const User = require('../models/user.model')
 const Ordergroup = require('../models/orderGoup.model')
+const Product = require('../models/product.model')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
@@ -414,9 +415,93 @@ const getOrderfullDetails = asyncHandler(async (req, res) => {
     });
 });
 
+const getOrderWithStatus = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    // Admin permission
+    if (role !== "admin" && role !== "superadmin") {
+        throw new ForbiddenError(
+            "You do not have permission to access this resource."
+        );
+    }
+
+    // Get ALL orders
+    // Only required fields will be returned
+    const orders = await Order.find(
+        {},
+        {
+            _id: 0,
+            order_id: 1,
+            userId: 1,
+            order_group_id: 1,
+            payment_mode: 1,
+            payment_status: 1,
+            order_status: 1,
+            inventory_status: 1
+        }
+    ).lean();
+
+    return res.status(200).json({
+        success: true,
+        message: "Order status details fetched successfully",
+        totalOrders: orders.length,
+        orders
+    });
+});
+
+const getLowStockproductDetails = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    // Admin permission
+    if (role !== "admin" && role !== "superadmin") {
+        throw new ForbiddenError(
+            "You do not have permission to access this resource."
+        );
+    }
+
+    const products = await Product.find({ is_active: true })
+        .select("product_name brand product_type floral_source variantDocumentId")
+        .populate({
+            path: "variantDocumentId",
+            select: "variants"
+        })
+        .lean();
+
+    const lowStockProducts = products
+        .map((product) => {
+            const lowStockVariants =
+                product.variantDocumentId?.variants?.filter(
+                    (variant) => variant.stock_status === "low_stock"
+                ) || [];
+
+            if (lowStockVariants.length === 0) {
+                return null;
+            }
+
+            return {
+                _id: product._id,
+                product_name: product.product_name,
+                brand: product.brand,
+                product_type: product.product_type,
+                floral_source: product.floral_source,
+                variants: lowStockVariants
+            };
+        })
+        .filter(Boolean);
+
+    return res.status(200).json({
+        success: true,
+        message: "Low stock products fetched successfully.",
+        count: lowStockProducts.length,
+        data: lowStockProducts
+    });
+});
+
 module.exports = {
     getAllOrders,
-    getOrderfullDetails
+    getOrderfullDetails,
+    getOrderWithStatus,
+    getLowStockproductDetails
 }
 
 

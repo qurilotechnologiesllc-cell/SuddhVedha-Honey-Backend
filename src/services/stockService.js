@@ -284,8 +284,7 @@ const checkStockBeforeOrder = async (items) => {
             const variantId =
                 item.product_details?.product?.variant?._id;
 
-            const quantity =
-                item.reserved_quantity || 1;
+            const quantity = item.reserved_quantity || 1;
 
             await checkVariantStock(
                 productId,
@@ -363,12 +362,7 @@ const checkVariantStock = async (
     }
 
 
-    const variant =
-        variantDoc.variants.find(
-            v =>
-                v._id.toString() ===
-                variantId.toString()
-        );
+    const variant = variantDoc.variants.find(v => v._id.toString() === variantId.toString());
 
 
     if (!variant) {
@@ -379,14 +373,7 @@ const checkVariantStock = async (
     }
 
 
-    const availableStock = variant.available_stock - (variant.reserved_stock || 0);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Stock Check
-    |--------------------------------------------------------------------------
-    */
+    const availableStock = variant.available_stock;
 
     if (
         !variant.allow_backorders &&
@@ -410,7 +397,7 @@ const checkVariantStock = async (
 
     if (
         !variant.allow_backorders &&
-        remainingStock < variant.low_stock_alert
+        remainingStock <= variant.low_stock_alert
     ) {
 
         throw new BadRequestError(
