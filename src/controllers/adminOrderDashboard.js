@@ -497,11 +497,157 @@ const getLowStockproductDetails = asyncHandler(async (req, res) => {
     });
 });
 
+const getOrderWeeklyOverview = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    // Admin permission
+    if (role !== "admin" && role !== "superadmin") {
+        throw new ForbiddenError(
+            "You do not have permission to access this resource."
+        );
+    }
+
+    const { date } = req.query;
+
+    // ------------------------------------
+    // 1. Validate date
+    // ------------------------------------
+    if (!date) {
+        throw new BadRequestError(
+            "Date is required. Example: 2026-09-22"
+        );
+    }
+
+    // Strict YYYY-MM-DD validation
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (!dateRegex.test(date)) {
+        throw new BadRequestError(
+            "Invalid date format. Use YYYY-MM-DD"
+        );
+    }
+
+    // ------------------------------------
+    // 2. Create selected date boundaries
+    // ------------------------------------
+    const selectedDate = new Date(`${date}T00:00:00+05:30`);
+
+    if (Number.isNaN(selectedDate.getTime())) {
+        throw new BadRequestError("Invalid date.");
+    }
+
+    // End date = next day 00:00 IST
+    const endDate = new Date(selectedDate);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
+
+    // ------------------------------------
+    // 3. Start date = selected date - 6 days
+    // ------------------------------------
+    const startDate = new Date(selectedDate);
+    startDate.setUTCDate(startDate.getUTCDate() - 6);
+
+    // ------------------------------------
+    // 4. MongoDB aggregation
+    // ------------------------------------
+    const dailyOrders = await Order.aggregate([
+        {
+            $match: {
+                createdAt: {
+                    $gte: startDate,
+                    $lt: endDate
+                }
+            }
+        },
+
+        {
+            $group: {
+                _id: {
+                    $dateToString: {
+                        format: "%Y-%m-%d",
+                        date: "$createdAt",
+                        timezone: "Asia/Kolkata"
+                    }
+                },
+                orders: {
+                    $sum: 1
+                }
+            }
+        },
+
+        {
+            $sort: {
+                _id: 1
+            }
+        }
+    ]);
+
+    // ------------------------------------
+    // 5. Convert aggregation result
+    // ------------------------------------
+    const orderMap = {};
+
+    dailyOrders.forEach((item) => {
+        orderMap[item._id] = item.orders;
+    });
+
+    // ------------------------------------
+    // 6. Generate all 7 days
+    // ------------------------------------
+    const dailyData = [];
+
+    for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(startDate);
+
+        currentDate.setUTCDate(
+            currentDate.getUTCDate() + i
+        );
+
+        const dateString = currentDate
+            .toISOString()
+            .split("T")[0];
+
+        dailyData.push({
+            date: dateString,
+            orders: orderMap[dateString] || 0
+        });
+    }
+
+    // ------------------------------------
+    // 7. Calculate total
+    // ------------------------------------
+    const totalOrders = dailyData.reduce(
+        (total, day) => total + day.orders,
+        0
+    );
+
+    // ------------------------------------
+    // 8. Response
+    // ------------------------------------
+    return res.status(200).json({
+        success: true,
+        message: "Weekly order overview fetched successfully.",
+        data: {
+            selectedDate: date,
+
+            period: {
+                startDate: dailyData[0].date,
+                endDate: dailyData[6].date,
+                days: 7
+            },
+
+            totalOrders,
+
+            dailyOrders: dailyData
+        }
+    });
+});
+
 module.exports = {
     getAllOrders,
     getOrderfullDetails,
     getOrderWithStatus,
-    getLowStockproductDetails
+    getLowStockproductDetails,
+    getOrderWeeklyOverview
 }
 
 
