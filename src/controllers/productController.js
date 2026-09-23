@@ -16,13 +16,13 @@ const createProduct = asyncHandler(async (req, res) => {
         floral_source,
         description,
         key_benefits,
-        ingredients,
         manufacturer_information,
         shelf_life,
         storage_instructions,
         country_of_origin,
         fssai_license_number,
         batch_number,
+        nutrition_info,
         categoryId
     } = req.body;
 
@@ -60,8 +60,6 @@ const createProduct = asyncHandler(async (req, res) => {
 
         key_benefits,
 
-        ingredients,
-
         manufacturer_information,
 
         shelf_life,
@@ -73,6 +71,8 @@ const createProduct = asyncHandler(async (req, res) => {
         fssai_license_number,
 
         batch_number,
+
+        nutrition_info,
 
         categoryId
 
@@ -405,13 +405,13 @@ const updateproductInformation = asyncHandler(async (req, res) => {
         "floral_source",
         "description",
         "key_benefits",
-        "ingredients",
         "manufacturer_information",
         "shelf_life",
         "storage_instructions",
         "country_of_origin",
         "fssai_license_number",
         "batch_number",
+        "nutrition_info"
     ];
 
     // Build update object only with allowed fields

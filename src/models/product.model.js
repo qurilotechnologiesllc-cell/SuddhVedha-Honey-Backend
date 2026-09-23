@@ -38,12 +38,6 @@ const ProductSchema = new mongoose.Schema(
             trim: true
         },
 
-        ingredients: {
-            type: String,
-            required: true,
-            trim: true
-        },
-
         manufacturer_information: {
             type: String,
             required: true,
@@ -80,6 +74,223 @@ const ProductSchema = new mongoose.Schema(
             index: true,
             trim: true
         },
+
+        // -----------------------------------------
+        // Nutrition Information
+        // -----------------------------------------
+
+        nutrition_info: {
+            serving_size: {
+                quantity: {
+                    type: Number,
+                    default: 1
+                },
+
+                unit: {
+                    type: String,
+                    default: "tbsp",
+                    trim: true
+                },
+
+                weight_g: {
+                    type: Number,
+                    default: 21
+                }
+            },
+
+            nutrients: {
+                energy: {
+                    unit: {
+                        type: String,
+                        default: "kcal"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                total_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                saturated_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                trans_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                cholesterol: {
+                    unit: {
+                        type: String,
+                        default: "mg"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                carbohydrates: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                natural_sugar: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                added_sugar: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                protein: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                sodium: {
+                    unit: {
+                        type: String,
+                        default: "mg"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                }
+            }
+        },
+
 
         // Existing references — unchanged
 

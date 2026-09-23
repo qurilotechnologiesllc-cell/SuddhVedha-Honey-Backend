@@ -674,20 +674,6 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
         if (!planPurchase) {
 
-            console.error(
-                "❌ Plan purchase not found:",
-                razorpayOrderId
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Important:
-            |--------------------------------------------------------------------------
-            | Webhook valid hai but hamare database
-            | mein matching purchase nahi mila.
-            |
-            */
-
             return res.status(404).json({
 
                 success: false,
