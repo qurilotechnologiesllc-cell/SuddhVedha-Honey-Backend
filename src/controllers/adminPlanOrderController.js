@@ -729,8 +729,8 @@ const createOrderOnVelocity = async ({
             payload,
             {
                 headers: {
+                    Authorization: `Bearer ${process.env.VELOCITY_API_KEY}`,
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${process.env.VELOCITY_TOKEN}`
                 }
             }
         );

@@ -13,7 +13,7 @@ const checkDeliveryAvailabilityService = async (toPincode) => {
         payload,
         {
             headers: {
-                Authorization: `Bearer ${process.env.VELOCITY_TOKEN}`,
+                Authorization: `Bearer ${process.env.VELOCITY_API_KEY}`,
                 "Content-Type": "application/json",
             },
         }

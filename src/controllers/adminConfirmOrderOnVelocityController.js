@@ -51,7 +51,7 @@ const checkDeliveryAvailabilitybyAdmin = asyncHandler(async (req, res) => {
     payload,
     {
       headers: {
-        Authorization: `Bearer ${process.env.VELOCITY_TOKEN}`,
+        Authorization: `Bearer ${process.env.VELOCITY_API_KEY}`,
         "Content-Type": "application/json",
       },
     });
@@ -185,13 +185,51 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
     });
   }
 
-  // ---------------------------------------------------
-  // 8. Check whether shipping and billing are same
-  // ---------------------------------------------------
+  const normalizeAddressValue = (value) => {
+    return String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  };
 
-  const shippingIsBilling =
-    JSON.stringify(shippingAddress) ===
-    JSON.stringify(billingAddress);
+  const isSameAddress = (shipping, billing) => {
+    if (!shipping || !billing) {
+      return false;
+    }
+
+    return (
+      normalizeAddressValue(shipping.full_name) ===
+      normalizeAddressValue(billing.full_name) &&
+
+      normalizeAddressValue(shipping.phone) ===
+      normalizeAddressValue(billing.phone) &&
+
+      normalizeAddressValue(shipping.address_line1) ===
+      normalizeAddressValue(billing.address_line1) &&
+
+      normalizeAddressValue(shipping.address_line2) ===
+      normalizeAddressValue(billing.address_line2) &&
+
+      normalizeAddressValue(shipping.city) ===
+      normalizeAddressValue(billing.city) &&
+
+      normalizeAddressValue(shipping.state) ===
+      normalizeAddressValue(billing.state) &&
+
+      normalizeAddressValue(shipping.pincode) ===
+      normalizeAddressValue(billing.pincode) &&
+
+      normalizeAddressValue(shipping.country) ===
+      normalizeAddressValue(billing.country)
+    );
+  };
+
+  const shippingIsBilling = isSameAddress(
+    shippingAddress,
+    billingAddress
+  );
+
+  const velocityDestinationAddress = shippingIsBilling ? billingAddress : shippingAddress;
 
   // ---------------------------------------------------
   // 9. Build Velocity order_items
@@ -223,9 +261,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
         name: product.product_name || "Product",
         sku: String(
           variant.sku ||
-          variant._id ||
-          product._id ||
-          item._id
+          variant._id
         ),
         units: Number(item.quantity || 1),
         selling_price: sellingPrice,
@@ -268,65 +304,40 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
 
     carrier_id: carrier_id,
 
+    // --------------------------------
+    // DESTINATION / BILLING ADDRESS
+    // --------------------------------
+
     billing_customer_name:
-      billingAddress.full_name || "",
+      velocityDestinationAddress.full_name || "",
 
     billing_last_name: "",
 
     billing_address:
-      billingAddress.address_line1 || "",
+      velocityDestinationAddress.address_line1 || "",
 
     billing_address_2:
-      billingAddress.address_line2 || "",
+      velocityDestinationAddress.address_line2 || "",
 
     billing_city:
-      billingAddress.city || "",
+      velocityDestinationAddress.city || "",
 
     billing_pincode:
-      billingAddress.pincode || "",
+      velocityDestinationAddress.pincode || "",
 
     billing_state:
-      billingAddress.state || "",
+      velocityDestinationAddress.state || "",
 
     billing_country:
-      billingAddress.country || "India",
+      velocityDestinationAddress.country || "India",
 
     billing_email:
       firstOrder.email || "",
 
     billing_phone:
-      billingAddress.phone || "",
+      velocityDestinationAddress.phone || "",
 
-    shipping_is_billing: shippingIsBilling,
-
-    shipping_customer_name:
-      shippingAddress.full_name || "",
-
-    shipping_last_name: "",
-
-    shipping_address:
-      shippingAddress.address_line1 || "",
-
-    shipping_address_2:
-      shippingAddress.address_line2 || "",
-
-    shipping_city:
-      shippingAddress.city || "",
-
-    shipping_pincode:
-      shippingAddress.pincode || "",
-
-    shipping_state:
-      shippingAddress.state || "",
-
-    shipping_country:
-      shippingAddress.country || "India",
-
-    shipping_email:
-      firstOrder.email || "",
-
-    shipping_phone:
-      shippingAddress.phone || "",
+    shipping_is_billing: true,
 
     print_label: true,
 
@@ -383,7 +394,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
       velocityPayload,
       {
         headers: {
-          Authorization: process.env.VELOCITY_TOKEN,
+          Authorization: `Bearer ${process.env.VELOCITY_API_KEY}`,
           "Content-Type": "application/json",
         },
       }
