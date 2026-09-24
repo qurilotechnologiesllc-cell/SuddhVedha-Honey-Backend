@@ -3,7 +3,7 @@ const ComboPack = require('../models/comboPack.model')
 const ComboProductImage = require('../models/comboProductImage.model')
 const cloudinary = require('../config/cloudinary')
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
-const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
+const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError, ServiceUnavailableError } = require('../errors/errorConfig')
 
 
 const createComboProduct = asyncHandler(async (req, res) => {
@@ -153,6 +153,77 @@ const uploadComboProductImage = asyncHandler(async (req, res) => {
 
 });
 
+const deleteImageOfComboProduct = asyncHandler(async (req, res) => {
+
+    const { comboProductId, imageId } = req.params;
+
+    const comboProductImageDoc = await ComboProductImage.findOne({
+        comboProductId
+    });
+
+    if (!comboProductImageDoc) {
+        throw new NotFoundError("No images found for this combo product.");
+    }
+
+    const image = comboProductImageDoc.images.id(imageId);
+
+    if (!image) {
+        throw new NotFoundError("Image not found.");
+    }
+
+    // 1. Delete image from Cloudinary first
+    const cloudinaryResponse = await deleteFromCloudinary(
+        image.public_id
+    );
+
+    if (
+        cloudinaryResponse.result !== "ok" &&
+        cloudinaryResponse.result !== "not found"
+    ) {
+        throw new ServiceUnavailableError(
+            "Unable to delete image from Cloudinary."
+        );
+    }
+
+    // 2. Cloudinary se delete ho gaya — ab images array se pull karo
+    comboProductImageDoc.images.pull(imageId);
+
+    // 3. Agar images array empty ho gaya, to poora document delete kar do
+    if (comboProductImageDoc.images.length === 0) {
+
+        await ComboProductImage.findByIdAndDelete(comboProductImageDoc._id);
+
+        return res.status(200).json({
+
+            success: true,
+
+            message: "Image deleted and image document removed (no images left).",
+
+            data: null
+
+        });
+
+    }
+
+    // Agar deleted image hi primary thi, to next image ko primary bana do
+    if (image.is_primary) {
+        comboProductImageDoc.images[0].is_primary = true;
+    }
+
+    await comboProductImageDoc.save();
+
+    res.status(200).json({
+
+        success: true,
+
+        message: "Image deleted successfully.",
+
+        data: comboProductImageDoc
+
+    });
+
+});
+
 const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
 
     const { comboProductId } = req.params;
@@ -245,11 +316,87 @@ const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
 
 });
 
+const removeSetPackfromComboProduct = asyncHandler(async (req, res) => {
+
+    const { comboProductId, setPackId } = req.params;
+
+    const { role } = req.user;
+
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new ForbiddenError(
+            'You do not have permission to access this resource.'
+        );
+    }
+
+    const comboProduct = await ComboProduct.findById(comboProductId);
+
+    if (!comboProduct) {
+        throw new NotFoundError("Combo product not found.");
+    }
+
+    const setPack = await ComboPack.findById(setPackId);
+
+    if (!setPack) {
+        throw new NotFoundError("Set pack not found.");
+    }
+
+    // Confirm setPack belongs to this comboProduct
+    if (setPack.comboProductId.toString() !== comboProductId) {
+        throw new NotFoundError(
+            "Set pack does not belong to this combo product."
+        );
+    }
+
+    // Delete image from Cloudinary first (agar image hai)
+    if (setPack.public_id) {
+
+        const cloudinaryResponse = await deleteFromCloudinary(
+            setPack.public_id
+        );
+
+        if (
+            cloudinaryResponse.result !== "ok" &&
+            cloudinaryResponse.result !== "not found"
+        ) {
+            throw new ServiceUnavailableError(
+                "Unable to delete set pack image from Cloudinary."
+            );
+        }
+
+    }
+
+    // Cloudinary se delete ho gaya (ya image thi hi nahi) — ab DB se remove karo
+    await ComboPack.findByIdAndDelete(setPackId);
+
+    // ComboProduct ke setPacks array se bhi id pull kar do
+    comboProduct.setPacks.pull(setPackId);
+
+    await comboProduct.save();
+
+    res.status(200).json({
+
+        success: true,
+
+        message: "Set pack removed successfully.",
+
+        data: {
+            comboProductId,
+            removedSetPackId: setPackId
+        }
+
+    });
+
+});
+
 const getAllcomboProducts = asyncHandler(async (req, res) => {
 
     // Saare combo products + unke setPacks populated
     const comboProducts = await ComboProduct
         .find()
+        .populate({
+            path: 'setPacks',
+            select: '-_id -comboProductId -__v -createdAt -updatedAt'
+        })
         .sort({ createdAt: -1 })
         .select('-setPacks')
         .lean();
@@ -333,10 +480,13 @@ const getComboProductDetails = asyncHandler(async (req, res) => {
 
 });
 
+
 module.exports = {
     createComboProduct,
     uploadComboProductImage,
+    deleteImageOfComboProduct,
     createSetPackOfcomboProduct,
     getAllcomboProducts,
-    getComboProductDetails
+    getComboProductDetails,
+    removeSetPackfromComboProduct
 }
