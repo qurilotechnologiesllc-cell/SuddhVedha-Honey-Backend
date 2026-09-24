@@ -28,6 +28,9 @@ const UserOrderRoutes = require('./routes/userOrderRoute.js');
 const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js');
 const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js');
 
+// Combo Product Routes
+const ComboProductsRoutes = require('./routes/comboProductsRoute.js')
+
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
 const productDashboardRoutes = require('./routes/productDashboardRoute');
@@ -119,6 +122,9 @@ app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
 app.use('/api/influencer', InfluencerDetails);
 app.use('/api/order', UserOrderRoutes);
 app.use('/api/purchase-plans', PurchasePlanRoutes);
+
+// combo product
+app.use('/api/combo/products', ComboProductsRoutes);
 
 // Admin Routes
 app.use('/api/admin', adminAuthRoutes);
