@@ -353,8 +353,19 @@ const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
         pack_size,
         mrp,
         selling_price,
-        discount_percent
+        discount_percent,
     } = req.body;
+
+    let { products } = req.body;
+
+    // 👇 form-data se products string ke roop me aati hai, JSON.parse karo
+    if (typeof products === "string") {
+        try {
+            products = JSON.parse(products);
+        } catch (err) {
+            throw new BadRequestError("products must be a valid JSON array.");
+        }
+    }
 
     // required fields check
     if (!pack_name || !pack_size || !mrp || !selling_price) {
@@ -366,6 +377,29 @@ const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
     // pack_size sirf 2, 3, 4 hi allowed hai (schema enum ke hisab se)
     if (![2, 3, 4].includes(Number(pack_size))) {
         throw new BadRequestError("pack_size must be 2, 3 or 4.");
+    }
+
+    // products array validation
+    if (!Array.isArray(products) || products.length === 0) {
+        throw new BadRequestError("products array is required.");
+    }
+
+    // products array ki length exactly pack_size ke barabar honi chahiye
+    if (products.length !== Number(pack_size)) {
+        throw new BadRequestError(
+            `products array must contain exactly ${pack_size} items for pack_size ${pack_size}.`
+        );
+    }
+
+    // har product me productId aur selectedWeight dono hone chahiye
+    const isValidProducts = products.every(
+        p => p && p.productId && p.selectedWeight
+    );
+
+    if (!isValidProducts) {
+        throw new BadRequestError(
+            "Each product in products array must have productId and selectedWeight."
+        );
     }
 
     const comboProduct = await ComboProduct.findById(comboProductId);
@@ -407,6 +441,8 @@ const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
 
         pack_size,
 
+        products,
+
         mrp,
 
         selling_price,
@@ -419,7 +455,7 @@ const createSetPackOfcomboProduct = asyncHandler(async (req, res) => {
 
     });
 
-    // 👇 ye naya step — comboPack ki id ComboProduct ke setPacks array me push kar rahe hai
+    // comboPack ki id ComboProduct ke setPacks array me push kar rahe hai
     comboProduct.setPacks.push(comboPack._id);
 
     await comboProduct.save();

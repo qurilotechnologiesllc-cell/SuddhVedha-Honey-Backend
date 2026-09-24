@@ -21,6 +21,24 @@ const ComboPackSchema = new mongoose.Schema(
             enum: [2, 3, 4]
         },
 
+        // pack_size ke hisab se products (unki productId + selectedWeight)
+        products: [
+            {
+                productId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Product",
+                    required: true
+                },
+
+                selectedWeight: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    required: true
+                },
+
+                _id: false
+            }
+        ],
+
         mrp: {
             type: Number,
             required: true,
