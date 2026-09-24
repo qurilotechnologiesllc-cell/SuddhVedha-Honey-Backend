@@ -62,6 +62,71 @@ const createComboProduct = asyncHandler(async (req, res) => {
     });
 });
 
+const updateComboproductinfo = asyncHandler(async (req, res) => {
+
+    const { comboProductId } = req.params;
+
+    const {
+        combo_name,
+        slug,
+        brand,
+        description,
+        key_benefits,
+        manufacturer_information,
+        shelf_life,
+        storage_instructions,
+        country_of_origin,
+        fssai_license_number,
+        is_active
+    } = req.body;
+
+    const comboProduct = await ComboProduct.findById(comboProductId);
+
+    if (!comboProduct) {
+        throw new NotFoundError("Combo product not found.");
+    }
+
+    // Agar slug change ho raha hai, to check karo koi aur combo product usi slug se to nahi
+    if (slug && slug.trim() !== comboProduct.slug) {
+
+        const existingSlug = await ComboProduct.findOne({
+            slug: slug.trim(),
+            _id: { $ne: comboProductId }
+        });
+
+        if (existingSlug) {
+            throw new ConflictError("A combo product with this slug already exists.");
+        }
+
+    }
+
+    // Partial update — jo field bheja hai sirf wahi update hoga
+    if (combo_name !== undefined) comboProduct.combo_name = combo_name;
+    if (slug !== undefined) comboProduct.slug = slug;
+    if (brand !== undefined) comboProduct.brand = brand;
+    if (description !== undefined) comboProduct.description = description;
+    if (key_benefits !== undefined) comboProduct.key_benefits = key_benefits;
+    if (manufacturer_information !== undefined) comboProduct.manufacturer_information = manufacturer_information;
+    if (shelf_life !== undefined) comboProduct.shelf_life = shelf_life;
+    if (storage_instructions !== undefined) comboProduct.storage_instructions = storage_instructions;
+    if (country_of_origin !== undefined) comboProduct.country_of_origin = country_of_origin;
+    if (fssai_license_number !== undefined) comboProduct.fssai_license_number = fssai_license_number;
+    if (is_active !== undefined) comboProduct.is_active = is_active;
+
+    await comboProduct.save();
+
+    res.status(200).json({
+
+        success: true,
+
+        message: "Combo product info updated successfully.",
+
+        data: comboProduct
+
+    });
+
+});
+
 const uploadComboProductImage = asyncHandler(async (req, res) => {
 
     const { comboProductId } = req.params;
@@ -217,6 +282,61 @@ const deleteImageOfComboProduct = asyncHandler(async (req, res) => {
         success: true,
 
         message: "Image deleted successfully.",
+
+        data: comboProductImageDoc
+
+    });
+
+});
+
+const updateComboProductImages = asyncHandler(async (req, res) => {
+
+    const { comboProductId } = req.params;
+
+    if (!req.file) {
+        throw new BadRequestError("No file uploaded.");
+    }
+
+    // 1. Find the existing ComboProductImage document
+    const comboProductImageDoc = await ComboProductImage.findOne({
+        comboProductId
+    });
+
+    if (!comboProductImageDoc) {
+        throw new NotFoundError("No image document found for this combo product.");
+    }
+
+    // 2. Upload the new image to Cloudinary
+    const result = await uploadToCloudinary(
+        req.file.buffer,
+        "comboProducts"
+    );
+
+    // 3. Agar koi primary image already nahi hai to isko primary bana do
+    const hasPrimary = comboProductImageDoc.images.some(img => img.is_primary);
+
+    const newImage = {
+
+        url: result.secure_url,
+
+        public_id: result.public_id,
+
+        is_primary: !hasPrimary,
+
+        sort_order: comboProductImageDoc.images.length
+
+    };
+
+    // 4. Push into images array
+    comboProductImageDoc.images.push(newImage);
+
+    await comboProductImageDoc.save();
+
+    res.status(200).json({
+
+        success: true,
+
+        message: "Combo product image updated successfully.",
 
         data: comboProductImageDoc
 
@@ -483,8 +603,10 @@ const getComboProductDetails = asyncHandler(async (req, res) => {
 
 module.exports = {
     createComboProduct,
+    updateComboproductinfo,
     uploadComboProductImage,
     deleteImageOfComboProduct,
+    updateComboProductImages,
     createSetPackOfcomboProduct,
     getAllcomboProducts,
     getComboProductDetails,
