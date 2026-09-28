@@ -6,7 +6,7 @@ const { authMiddleware } = require('../middlewares/authmiddleware')
 
 const { uploadSingle } = require('../middlewares/upload.middleware')
 
-router.post('/add', authMiddleware, addSubscripationPlans)
+router.post('/add', authMiddleware, uploadSingle, addSubscripationPlans)
 
 router.post('/add/plan-comboset', authMiddleware, uploadSingle, AddComboSetsInPlans)
 

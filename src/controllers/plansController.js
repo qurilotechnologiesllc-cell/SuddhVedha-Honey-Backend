@@ -48,6 +48,24 @@ const addSubscripationPlans = asyncHandler(async (req, res) => {
 
 
     // ==========================================
+    // IMAGE VALIDATION
+    // ==========================================
+
+    if (!req.file) {
+        throw new BadRequestError(
+            "Plan image is required"
+        );
+    }
+
+
+    if (!req.file.buffer) {
+        throw new BadRequestError(
+            "Plan image buffer is missing"
+        );
+    }
+
+
+    // ==========================================
     // BASIC FIELD VALIDATION
     // ==========================================
 
@@ -216,78 +234,139 @@ const addSubscripationPlans = asyncHandler(async (req, res) => {
 
 
     // ==========================================
+    // UPLOAD IMAGE TO CLOUDINARY
+    // ==========================================
+
+    const uploadedImage =
+        await uploadToCloudinary(
+            req.file.buffer,
+            "sudhvedahoney/plans"
+        );
+
+
+    // ==========================================
+    // VALIDATE CLOUDINARY RESPONSE
+    // ==========================================
+
+    if (
+        !uploadedImage ||
+        !uploadedImage.secure_url ||
+        !uploadedImage.public_id
+    ) {
+        throw new BadRequestError(
+            "Failed to upload plan image"
+        );
+    }
+
+
+    // ==========================================
     // CREATE PLAN
     // ==========================================
 
-    const plan = await Plans.create({
+    let plan;
 
-        // --------------------------------------
-        // Basic Information
-        // --------------------------------------
+    try {
 
-        name:
-            name.trim(),
+        plan = await Plans.create({
 
-        description:
-            description.trim(),
+            // --------------------------------------
+            // Basic Information
+            // --------------------------------------
 
-        idealFor:
-            idealFor.trim(),
+            name:
+                name.trim(),
 
+            image_url:
+                uploadedImage.secure_url,
 
-        // --------------------------------------
-        // Duration
-        // --------------------------------------
+            public_id:
+                uploadedImage.public_id,
 
-        durationMonths:
-            parsedDurationMonths,
+            description:
+                description.trim(),
 
-
-        // --------------------------------------
-        // ComboSet Reference
-        // --------------------------------------
-        // Initially null.
-        // It will be attached when
-        // PlanComboSet is created.
-
-        comboSetId:
-            null,
+            idealFor:
+                idealFor.trim(),
 
 
-        // --------------------------------------
-        // Pricing
-        // --------------------------------------
+            // --------------------------------------
+            // Duration
+            // --------------------------------------
 
-        price:
-            parsedPrice,
-
-        originalPrice:
-            parsedOriginalPrice,
-
-        discountPercentage:
-            discountPercentage,
+            durationMonths:
+                parsedDurationMonths,
 
 
-        // --------------------------------------
-        // Other
-        // --------------------------------------
+            // --------------------------------------
+            // ComboSet Reference
+            // --------------------------------------
 
-        currency:
-            currency?.trim() || "INR",
+            comboSetId:
+                null,
 
-        badge:
-            badge?.trim() || null,
 
-        isPopular:
-            isPopular === true ||
-            isPopular === "true",
+            // --------------------------------------
+            // Pricing
+            // --------------------------------------
 
-        isActive:
-            isActive === undefined
-                ? true
-                : isActive === true ||
-                isActive === "true"
-    });
+            price:
+                parsedPrice,
+
+            originalPrice:
+                parsedOriginalPrice,
+
+            discountPercentage:
+                discountPercentage,
+
+
+            // --------------------------------------
+            // Other
+            // --------------------------------------
+
+            currency:
+                currency?.trim() || "INR",
+
+            badge:
+                badge?.trim() || null,
+
+            isPopular:
+                isPopular === true ||
+                isPopular === "true",
+
+            isActive:
+                isActive === undefined
+                    ? true
+                    : isActive === true ||
+                    isActive === "true"
+        });
+
+    } catch (error) {
+
+        // ==========================================
+        // DATABASE FAILED AFTER CLOUDINARY UPLOAD
+        // Remove uploaded image to avoid orphan image
+        // ==========================================
+
+        if (uploadedImage.public_id) {
+
+            try {
+
+                await deleteFromCloudinary(
+                    uploadedImage.public_id
+                );
+
+            } catch (deleteError) {
+
+                console.error(
+                    "Failed to cleanup Cloudinary image:",
+                    deleteError
+                );
+
+            }
+        }
+
+        throw error;
+    }
 
 
     // ==========================================
@@ -303,7 +382,6 @@ const addSubscripationPlans = asyncHandler(async (req, res) => {
 
         data:
             plan
-
     });
 });
 

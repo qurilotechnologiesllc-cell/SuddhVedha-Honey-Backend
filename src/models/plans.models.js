@@ -8,6 +8,18 @@ const plansSchema = new Schema(
             trim: true
         },
 
+        image_url: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        public_id: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
         description: {
             type: String,
             required: true,
