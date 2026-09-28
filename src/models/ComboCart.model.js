@@ -1,6 +1,6 @@
 const { Schema, model } = require("mongoose");
 
-const giftCartSchema = new Schema({
+const ComboCartSchema = new Schema({
 
     userId: {
         type: Schema.Types.ObjectId,
@@ -12,9 +12,9 @@ const giftCartSchema = new Schema({
 
         {
 
-            giftBoxId: {
+            setPackId: {
                 type: Schema.Types.ObjectId,
-                ref: "GiftBox",
+                ref: "ComboPack",
                 required: true
             },
 
@@ -53,4 +53,4 @@ const giftCartSchema = new Schema({
     timestamps: true
 });
 
-module.exports = model("GiftCart", giftCartSchema);
+module.exports = model("ComboCart", ComboCartSchema);

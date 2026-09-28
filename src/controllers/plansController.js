@@ -1,358 +1,906 @@
+const mongoose = require("mongoose");
 const Plans = require('../models/plans.models')
+const PlanComboSet = require('../models/PlanComboSet.model')
 const { asyncHandler, BadRequestError, UnauthorizedError, ConflictError } = require('../errors/errorConfig')
 
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
 
 const addSubscripationPlans = asyncHandler(async (req, res) => {
-    const { role } = req.user
 
-    // Only admin can create subscription plans
-    if (role !== 'admin') {
-        throw new UnauthorizedError('Plans can only be added by admin')
+    const { role } = req.user;
+
+    // ==========================================
+    // ADMIN CHECK
+    // ==========================================
+
+    if (role !== "admin") {
+        throw new UnauthorizedError(
+            "Plans can only be added by admin"
+        );
     }
 
-    // Image is required
-    if (!req.file) {
-        throw new BadRequestError('Plan image is required')
-    }
+
+    // ==========================================
+    // REQUEST BODY
+    // ==========================================
 
     const {
         name,
         description,
-        packageLabel,
-        quantityPerJar,
-        quantityUnit,
-        numberOfJars,
-        totalQuantity,
-        totalQuantityUnit,
         idealFor,
+
+        // Pricing
         price,
         originalPrice,
         currency,
+
+        // Badge
         badge,
         isPopular,
+
+        // Duration
         durationMonths,
-        deliveriesPerMonth,
-        jarsPerDelivery,
-        isActive,
-        displayOrder,
-    } = req.body
 
-    // -----------------------------
-    // Required field validation
-    // -----------------------------
+        // Status
+        isActive
+    } = req.body;
 
-    if (!name || !name.trim()) {
-        throw new BadRequestError('Plan name is required')
-    }
 
-    if (!description || !description.trim()) {
-        throw new BadRequestError('Plan description is required')
-    }
-
-    if (!packageLabel || !packageLabel.trim()) {
-        throw new BadRequestError('Package label is required')
-    }
+    // ==========================================
+    // BASIC FIELD VALIDATION
+    // ==========================================
 
     if (
-        quantityPerJar === undefined ||
-        quantityPerJar === null ||
-        quantityPerJar === ''
+        !name ||
+        typeof name !== "string" ||
+        !name.trim()
     ) {
-        throw new BadRequestError('Quantity per jar is required')
+        throw new BadRequestError(
+            "Plan name is required"
+        );
     }
 
-    if (!quantityUnit) {
-        throw new BadRequestError('Quantity unit is required')
-    }
 
     if (
-        numberOfJars === undefined ||
-        numberOfJars === null ||
-        numberOfJars === ''
+        !description ||
+        typeof description !== "string" ||
+        !description.trim()
     ) {
-        throw new BadRequestError('Number of jars is required')
+        throw new BadRequestError(
+            "Plan description is required"
+        );
     }
+
 
     if (
-        totalQuantity === undefined ||
-        totalQuantity === null ||
-        totalQuantity === ''
+        !idealFor ||
+        typeof idealFor !== "string" ||
+        !idealFor.trim()
     ) {
-        throw new BadRequestError('Total quantity is required')
+        throw new BadRequestError(
+            "Ideal for field is required"
+        );
     }
 
-    if (!totalQuantityUnit) {
-        throw new BadRequestError('Total quantity unit is required')
+
+    // ==========================================
+    // DURATION VALIDATION
+    // ==========================================
+
+    if (
+        durationMonths === undefined ||
+        durationMonths === null ||
+        durationMonths === ""
+    ) {
+        throw new BadRequestError(
+            "Duration months is required"
+        );
     }
 
-    if (!idealFor || !idealFor.trim()) {
-        throw new BadRequestError('Ideal for field is required')
+
+    const parsedDurationMonths =
+        Number(durationMonths);
+
+
+    if (
+        !Number.isInteger(parsedDurationMonths) ||
+        parsedDurationMonths < 1
+    ) {
+        throw new BadRequestError(
+            "Duration months must be a valid positive integer"
+        );
     }
+
+
+    // ==========================================
+    // PRICE VALIDATION
+    // ==========================================
 
     if (
         price === undefined ||
         price === null ||
-        price === ''
+        price === ""
     ) {
-        throw new BadRequestError('Price is required')
+        throw new BadRequestError(
+            "Price is required"
+        );
     }
+
 
     if (
         originalPrice === undefined ||
         originalPrice === null ||
-        originalPrice === ''
+        originalPrice === ""
     ) {
-        throw new BadRequestError('Original price is required')
+        throw new BadRequestError(
+            "Original price is required"
+        );
     }
 
-    // -----------------------------
-    // Validate numeric values
-    // -----------------------------
 
-    const parsedQuantityPerJar = Number(quantityPerJar)
-    const parsedNumberOfJars = Number(numberOfJars)
-    const parsedTotalQuantity = Number(totalQuantity)
-    const parsedPrice = Number(price)
-    const parsedOriginalPrice = Number(originalPrice)
+    const parsedPrice =
+        Number(price);
 
-    if (isNaN(parsedQuantityPerJar) || parsedQuantityPerJar < 0) {
-        throw new BadRequestError('Invalid quantity per jar')
-    }
+    const parsedOriginalPrice =
+        Number(originalPrice);
 
-    if (isNaN(parsedNumberOfJars) || parsedNumberOfJars < 1) {
-        throw new BadRequestError('Number of jars must be at least 1')
-    }
-
-    if (isNaN(parsedTotalQuantity) || parsedTotalQuantity < 0) {
-        throw new BadRequestError('Invalid total quantity')
-    }
-
-    if (isNaN(parsedPrice) || parsedPrice < 0) {
-        throw new BadRequestError('Invalid price')
-    }
 
     if (
-        isNaN(parsedOriginalPrice) ||
+        !Number.isFinite(parsedPrice) ||
+        parsedPrice < 0
+    ) {
+        throw new BadRequestError(
+            "Invalid price"
+        );
+    }
+
+
+    if (
+        !Number.isFinite(parsedOriginalPrice) ||
         parsedOriginalPrice < 0
     ) {
-        throw new BadRequestError('Invalid original price')
-    }
-
-    if (parsedPrice > parsedOriginalPrice) {
         throw new BadRequestError(
-            'Price cannot be greater than original price'
-        )
+            "Invalid original price"
+        );
     }
 
-    // -----------------------------
-    // Check duplicate plan name
-    // -----------------------------
 
-    const existingPlan = await Plans.findOne({
-        name: name.trim(),
-    })
+    if (
+        parsedPrice > parsedOriginalPrice
+    ) {
+        throw new BadRequestError(
+            "Price cannot be greater than original price"
+        );
+    }
+
+
+    // ==========================================
+    // CALCULATE DISCOUNT
+    // ==========================================
+
+    let discountPercentage = 0;
+
+
+    if (parsedOriginalPrice > 0) {
+
+        discountPercentage =
+            (
+                (parsedOriginalPrice - parsedPrice) /
+                parsedOriginalPrice
+            ) * 100;
+
+
+        discountPercentage =
+            Number(
+                discountPercentage.toFixed(2)
+            );
+    }
+
+
+    // ==========================================
+    // CHECK DUPLICATE PLAN
+    // ==========================================
+
+    const existingPlan =
+        await Plans.findOne({
+            name: name.trim()
+        });
+
 
     if (existingPlan) {
         throw new ConflictError(
-            'A subscription plan with this name already exists'
-        )
+            "A subscription plan with this name already exists"
+        );
     }
 
-    // -----------------------------
-    // Calculate discount
-    // -----------------------------
 
-    let discountPercentage = 0
+    // ==========================================
+    // CREATE PLAN
+    // ==========================================
 
-    if (parsedOriginalPrice > 0) {
-        discountPercentage =
-            ((parsedOriginalPrice - parsedPrice) /
-                parsedOriginalPrice) *
-            100
+    const plan = await Plans.create({
 
-        discountPercentage = Number(
-            discountPercentage.toFixed(2)
-        )
-    }
+        // --------------------------------------
+        // Basic Information
+        // --------------------------------------
 
-    // -----------------------------
-    // Upload image to Cloudinary
-    // -----------------------------
+        name:
+            name.trim(),
 
-    let cloudinaryResult = await uploadToCloudinary(
-        req.file.buffer,
-        'sudhvedahoney/plans',
-        'image'
-    )
+        description:
+            description.trim(),
 
-    // Make sure Cloudinary returned required values
-    if (
-        !cloudinaryResult.secure_url ||
-        !cloudinaryResult.public_id
-    ) {
-        throw new BadRequestError(
-            'Invalid Cloudinary upload response'
-        )
-    }
+        idealFor:
+            idealFor.trim(),
 
-    const image = cloudinaryResult.secure_url
-    const public_id = cloudinaryResult.public_id
 
-    try {
-        const plan = await Plans.create({
-            name: name.trim(),
-            description: description.trim(),
+        // --------------------------------------
+        // Duration
+        // --------------------------------------
 
-            image,
-            public_id,
+        durationMonths:
+            parsedDurationMonths,
 
-            packageLabel: packageLabel.trim(),
 
-            quantityPerJar: parsedQuantityPerJar,
-            quantityUnit,
+        // --------------------------------------
+        // ComboSet Reference
+        // --------------------------------------
+        // Initially null.
+        // It will be attached when
+        // PlanComboSet is created.
 
-            numberOfJars: parsedNumberOfJars,
+        comboSetId:
+            null,
 
-            totalQuantity: parsedTotalQuantity,
-            totalQuantityUnit,
 
-            idealFor: idealFor.trim(),
+        // --------------------------------------
+        // Pricing
+        // --------------------------------------
 
-            price: parsedPrice,
-            originalPrice: parsedOriginalPrice,
+        price:
+            parsedPrice,
+
+        originalPrice:
+            parsedOriginalPrice,
+
+        discountPercentage:
             discountPercentage,
 
-            currency: currency || 'INR',
 
-            badge: badge?.trim() || null,
+        // --------------------------------------
+        // Other
+        // --------------------------------------
 
-            isPopular:
-                isPopular === true ||
-                isPopular === 'true',
+        currency:
+            currency?.trim() || "INR",
 
-            isActive:
-                isActive === undefined
-                    ? true
-                    : isActive === true ||
-                    isActive === 'true',
+        badge:
+            badge?.trim() || null,
 
-            durationMonths: durationMonths || 6,
+        isPopular:
+            isPopular === true ||
+            isPopular === "true",
 
-            deliveriesPerMonth: deliveriesPerMonth || 1,
+        isActive:
+            isActive === undefined
+                ? true
+                : isActive === true ||
+                isActive === "true"
+    });
 
-            jarsPerDelivery: jarsPerDelivery || 1,
 
-            displayOrder:
-                displayOrder !== undefined
-                    ? Number(displayOrder)
-                    : 0,
-        })
+    // ==========================================
+    // RESPONSE
+    // ==========================================
 
-        return res.status(201).json({
-            success: true,
-            message: 'Subscription plan added successfully',
-            data: plan,
-        })
-    } catch (error) {
+    return res.status(201).json({
 
-        try {
-            await deleteFromCloudinary(public_id)
-        } catch (deleteError) {
-            console.error(
-                'Failed to delete Cloudinary image after DB error:',
-                deleteError
-            )
-        }
-
-        throw error
-    }
-})
-
-const getSubscripationPlans = asyncHandler(async (req, res) => {
-    const plans = await Plans.find({
-        isActive: true,
-    })
-        .sort({
-            displayOrder: 1,
-            createdAt: 1,
-        })
-        .lean()
-
-    return res.status(200).json({
         success: true,
-        message: 'Subscription plans fetched successfully',
-        count: plans.length,
-        data: plans,
-    })
-})
 
-const removeSubscripationPlans = asyncHandler(async (req, res) => {
-    const { plansId } = req.params
-    const { role } = req.user
+        message:
+            "Subscription plan added successfully",
 
-    // Only admin can remove subscription plans
-    if (role !== 'admin') {
+        data:
+            plan
+
+    });
+});
+
+const AddComboSetsInPlans = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    // ==========================================
+    // ADMIN CHECK
+    // ==========================================
+
+    if (role !== "admin") {
         throw new UnauthorizedError(
-            'Plans can only be removed by admin'
-        )
+            "Plans can only be added by admin"
+        );
     }
 
-    // Validate plan ID
-    if (!plansId) {
+    const {
+        planId,
+        monthName,
+        title,
+        products,
+        season,
+        harvestTitle,
+        description,
+        readMore
+    } = req.body;
+
+    // ==========================================
+    // VALIDATE PLAN ID
+    // ==========================================
+
+    if (!planId) {
         throw new BadRequestError(
-            'Subscription plan ID is required'
-        )
+            "Plan ID is required"
+        );
     }
 
-    // Find the plan first
-    const plan = await Plans.findById(plansId)
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+        throw new BadRequestError(
+            "Invalid plan ID"
+        );
+    }
+
+    // ==========================================
+    // FIND PLAN
+    // ==========================================
+
+    const plan = await Plans.findById(planId);
 
     if (!plan) {
         throw new NotFoundError(
-            'Subscription plan not found'
-        )
+            "Subscription plan not found"
+        );
     }
 
-    // -----------------------------------
-    // Remove image from Cloudinary
-    // -----------------------------------
+    // ==========================================
+    // VALIDATE BASIC FIELDS
+    // ==========================================
 
-    if (plan.public_id) {
+    if (
+        !monthName ||
+        typeof monthName !== "string" ||
+        !monthName.trim()
+    ) {
+        throw new BadRequestError(
+            "Month name is required"
+        );
+    }
+
+    if (
+        !title ||
+        typeof title !== "string" ||
+        !title.trim()
+    ) {
+        throw new BadRequestError(
+            "Title is required"
+        );
+    }
+
+    if (
+        !season ||
+        typeof season !== "string" ||
+        !season.trim()
+    ) {
+        throw new BadRequestError(
+            "Season is required"
+        );
+    }
+
+    if (
+        !harvestTitle ||
+        typeof harvestTitle !== "string" ||
+        !harvestTitle.trim()
+    ) {
+        throw new BadRequestError(
+            "Harvest title is required"
+        );
+    }
+
+    if (
+        !description ||
+        typeof description !== "string" ||
+        !description.trim()
+    ) {
+        throw new BadRequestError(
+            "Description is required"
+        );
+    }
+
+    if (
+        !readMore ||
+        typeof readMore !== "string" ||
+        !readMore.trim()
+    ) {
+        throw new BadRequestError(
+            "Read more content is required"
+        );
+    }
+
+    // ==========================================
+    // PARSE PRODUCTS
+    // ==========================================
+
+    let parsedProducts = products;
+
+    if (typeof products === "string") {
         try {
-            await deleteFromCloudinary(plan.public_id)
+            parsedProducts = JSON.parse(products);
         } catch (error) {
-            console.error(
-                'Cloudinary image deletion failed:',
-                error
-            )
-
             throw new BadRequestError(
-                'Failed to remove plan image from Cloudinary. Plan was not deleted.'
-            )
+                "Products must be a valid JSON array"
+            );
         }
     }
 
-    // -----------------------------------
-    // Remove plan from database
-    // -----------------------------------
+    // ==========================================
+    // VALIDATE PRODUCTS ARRAY
+    // ==========================================
 
-    await Plans.findByIdAndDelete(plansId)
+    if (
+        !Array.isArray(parsedProducts) ||
+        parsedProducts.length === 0
+    ) {
+        throw new BadRequestError(
+            "At least one product is required"
+        );
+    }
+
+    // ==========================================
+    // VALIDATE EACH PRODUCT
+    // ==========================================
+
+    parsedProducts = parsedProducts.map(
+        (product, index) => {
+
+            if (
+                !product ||
+                typeof product !== "object"
+            ) {
+                throw new BadRequestError(
+                    `Invalid product at index ${index}`
+                );
+            }
+
+            if (
+                !product.name ||
+                typeof product.name !== "string" ||
+                !product.name.trim()
+            ) {
+                throw new BadRequestError(
+                    `Product name is required at index ${index}`
+                );
+            }
+
+            const weight = Number(product.weight);
+
+            if (
+                !Number.isFinite(weight) ||
+                weight <= 0
+            ) {
+                throw new BadRequestError(
+                    `Invalid product weight at index ${index}`
+                );
+            }
+
+            // Only 500g products allowed
+            if (weight !== 500) {
+                throw new BadRequestError(
+                    `Product weight must be 500g at index ${index}`
+                );
+            }
+
+            if (product.unit !== "g") {
+                throw new BadRequestError(
+                    `Product unit must be g at index ${index}`
+                );
+            }
+
+            return {
+                name: product.name.trim(),
+                weight: 500,
+                unit: "g"
+            };
+        }
+    );
+
+    // ==========================================
+    // FIND EXISTING PLAN COMBO SET
+    // ==========================================
+
+    let planComboSet = null;
+
+    if (plan.comboSetId) {
+
+        planComboSet =
+            await PlanComboSet.findById(
+                plan.comboSetId
+            );
+
+        if (!planComboSet) {
+            throw new NotFoundError(
+                "Plan combo set document not found"
+            );
+        }
+    }
+
+    // ==========================================
+    // DUPLICATE MONTH CHECK
+    // ==========================================
+
+    if (planComboSet) {
+
+        const normalizedMonthName =
+            monthName.trim().toLowerCase();
+
+        const monthAlreadyExists =
+            planComboSet.combosets.some(
+                combo =>
+                    combo.monthName
+                        ?.trim()
+                        .toLowerCase() ===
+                    normalizedMonthName
+            );
+
+        if (monthAlreadyExists) {
+            throw new ConflictError(
+                `${monthName.trim()} combo set already exists for this plan`
+            );
+        }
+    }
+
+    // ==========================================
+    // IMAGE VALIDATION
+    // ==========================================
+
+    if (!req.file) {
+        throw new BadRequestError(
+            "Combo set image is required"
+        );
+    }
+
+    // ==========================================
+    // UPLOAD IMAGE TO CLOUDINARY
+    // ==========================================
+
+    const uploadedImage =
+        await uploadToCloudinary(
+            req.file.buffer,
+            "sudhvedahoney/plans"
+        );
+
+    // ==========================================
+    // CREATE NEW COMBO SET OBJECT
+    // ==========================================
+
+    const newComboSet = {
+        monthName: monthName.trim(),
+
+        title: title.trim(),
+
+        image: uploadedImage.secure_url,
+
+        public_id: uploadedImage.public_id,
+
+        products: parsedProducts,
+
+        season: season.trim(),
+
+        harvestTitle: harvestTitle.trim(),
+
+        description: description.trim(),
+
+        readMore: readMore.trim()
+    };
+
+    // ==========================================
+    // CASE 1:
+    // EXISTING PLAN COMBO SET
+    // ==========================================
+
+    if (planComboSet) {
+
+        planComboSet.combosets.push(
+            newComboSet
+        );
+
+        await planComboSet.save();
+
+        return res.status(200).json({
+            success: true,
+
+            message:
+                "New combo set added to the subscription plan successfully",
+
+            data: planComboSet
+        });
+    }
+
+    // ==========================================
+    // CASE 2:
+    // FIRST COMBO SET
+    // ==========================================
+
+    const newPlanComboSet =
+        await PlanComboSet.create({
+            planId: plan._id,
+
+            combosets: [
+                newComboSet
+            ]
+        });
+
+    // ==========================================
+    // SAVE comboSetId INTO PLAN
+    // ==========================================
+
+    plan.comboSetId =
+        newPlanComboSet._id;
+
+    await plan.save();
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(201).json({
+        success: true,
+
+        message:
+            "Plan combo set created successfully",
+
+        data: newPlanComboSet
+    });
+});
+
+const getSubscripationPlans = asyncHandler(async (req, res) => {
+
+    const plans = await Plans.find({
+        isActive: true,
+    })
+        .populate({
+            path: "comboSetId",
+            select: "combosets createdAt updatedAt"
+        })
+        .sort({
+            createdAt: 1
+        })
+        .lean();
 
     return res.status(200).json({
         success: true,
-        message: 'Subscription plan removed successfully',
+        message: "Subscription plans fetched successfully",
+        count: plans.length,
+        data: plans
+    });
+});
+
+const removeComboSets = asyncHandler(async (req, res) => {
+    const { planId, combosetId } = req.params;
+
+    // ==========================================
+    // VALIDATE IDS
+    // ==========================================
+
+    if (!planId) {
+        throw new BadRequestError(
+            "Plan ID is required"
+        );
+    }
+
+    if (!combosetId) {
+        throw new BadRequestError(
+            "Combo set ID is required"
+        );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+        throw new BadRequestError(
+            "Invalid plan ID"
+        );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(combosetId)) {
+        throw new BadRequestError(
+            "Invalid combo set ID"
+        );
+    }
+
+    // ==========================================
+    // FIND PLAN
+    // ==========================================
+
+    const plan = await Plans.findById(planId);
+
+    if (!plan) {
+        throw new NotFoundError(
+            "Subscription plan not found"
+        );
+    }
+
+    // ==========================================
+    // CHECK PLAN COMBO SET REFERENCE
+    // ==========================================
+
+    if (!plan.comboSetId) {
+        throw new NotFoundError(
+            "No combo sets found for this plan"
+        );
+    }
+
+    // ==========================================
+    // FIND PLAN COMBO SET DOCUMENT
+    // ==========================================
+
+    const planComboSet =
+        await PlanComboSet.findById(
+            plan.comboSetId
+        );
+
+    if (!planComboSet) {
+        throw new NotFoundError(
+            "Plan combo set document not found"
+        );
+    }
+
+    // ==========================================
+    // FIND COMBO SET
+    // ==========================================
+
+    const comboSet =
+        planComboSet.combosets.find(
+            combo =>
+                combo._id.toString() ===
+                combosetId
+        );
+
+    if (!comboSet) {
+        throw new NotFoundError(
+            "Combo set not found"
+        );
+    }
+
+    // ==========================================
+    // DELETE IMAGE FROM CLOUDINARY
+    // ==========================================
+
+    if (comboSet.public_id) {
+        await deleteFromCloudinary(
+            comboSet.public_id
+        );
+    }
+
+    // ==========================================
+    // REMOVE COMBO SET FROM ARRAY
+    // ==========================================
+
+    planComboSet.combosets.pull(
+        combosetId
+    );
+
+    await planComboSet.save();
+
+    // ==========================================
+    // OPTIONAL:
+    // IF NO COMBO SETS REMAIN
+    // ==========================================
+
+    if (planComboSet.combosets.length === 0) {
+
+        await PlanComboSet.findByIdAndDelete(
+            planComboSet._id
+        );
+
+        plan.comboSetId = null;
+
+        await plan.save();
+
+        return res.status(200).json({
+            success: true,
+            message:
+                "Combo set and its image deleted successfully. No combo sets remain for this plan.",
+            data: {
+                planId,
+                combosetId
+            }
+        });
+    }
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(200).json({
+        success: true,
+        message:
+            "Combo set removed successfully",
+        data: planComboSet
+    });
+});
+
+const removeSubscripationPlans = asyncHandler(async (req, res) => {
+    const { plansId } = req.params;
+    const { role } = req.user;
+
+    // ==========================================
+    // ADMIN CHECK
+    // ==========================================
+
+    if (role !== "admin") {
+        throw new UnauthorizedError(
+            "Plans can only be removed by admin"
+        );
+    }
+
+    // ==========================================
+    // VALIDATE PLAN ID
+    // ==========================================
+
+    if (!plansId) {
+        throw new BadRequestError(
+            "Subscription plan ID is required"
+        );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(plansId)) {
+        throw new BadRequestError(
+            "Invalid subscription plan ID"
+        );
+    }
+
+    // ==========================================
+    // FIND PLAN
+    // ==========================================
+
+    const plan = await Plans.findById(plansId);
+
+    if (!plan) {
+        throw new NotFoundError(
+            "Subscription plan not found"
+        );
+    }
+
+    // ==========================================
+    // CHECK COMBO SET
+    // ==========================================
+
+    if (plan.comboSetId) {
+        throw new BadRequestError(
+            "This subscription plan cannot be deleted because combo sets are still attached to it. Please remove all combo sets first."
+        );
+    }
+
+    // ==========================================
+    // DELETE PLAN
+    // ==========================================
+
+    await Plans.findByIdAndDelete(plansId);
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(200).json({
+        success: true,
+        message: "Subscription plan removed successfully",
         data: {
             id: plan._id,
-            name: plan.name,
-        },
-    })
-})
+            name: plan.name
+        }
+    });
+});
 
 
 module.exports = {
     addSubscripationPlans,
+    AddComboSetsInPlans,
     getSubscripationPlans,
+    removeComboSets,
     removeSubscripationPlans
 }

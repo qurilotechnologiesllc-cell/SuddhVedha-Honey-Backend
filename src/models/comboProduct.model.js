@@ -2,12 +2,15 @@ const mongoose = require("mongoose");
 
 const ComboProductSchema = new mongoose.Schema(
     {
+        // Example: "Golden Duo"
         combo_name: {
             type: String,
             required: true,
             trim: true
         },
 
+        // Example:
+        // mustard-honey-lychee-honey-golden-duo
         slug: {
             type: String,
             required: true,
@@ -20,6 +23,73 @@ const ComboProductSchema = new mongoose.Schema(
             default: "SudhVeda Honey",
             trim: true
         },
+
+        // Total number of jars/products in combo
+        // Example: 2
+        combo_size: {
+            type: Number,
+            required: true,
+            min: 2
+        },
+
+        // Products included inside combo
+        // Products included inside combo
+        products: [
+            {
+                _id: false,
+
+                name: {
+                    type: String,
+                    required: true,
+                    trim: true
+                },
+
+                weight: {
+                    type: Number,
+                    required: true,
+                    min: 1
+                },
+
+                unit: {
+                    type: String,
+                    required: true,
+                    enum: ["g", "kg"]
+                }
+            }
+        ],
+
+        // =========================
+        // PRICING
+        // =========================
+
+        mrp: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+
+        selling_price: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+
+        discount_percent: {
+            type: Number,
+            required: true,
+            min: 0,
+            max: 100
+        },
+
+        save: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+
+        // =========================
+        // PRODUCT DETAILS
+        // =========================
 
         description: {
             type: String,
@@ -51,6 +121,218 @@ const ComboProductSchema = new mongoose.Schema(
             trim: true
         },
 
+        nutrition_info: {
+            serving_size: {
+                quantity: {
+                    type: Number,
+                    default: 1
+                },
+
+                unit: {
+                    type: String,
+                    default: "tbsp",
+                    trim: true
+                },
+
+                weight_g: {
+                    type: Number,
+                    default: 21
+                }
+            },
+
+            nutrients: {
+                energy: {
+                    unit: {
+                        type: String,
+                        default: "kcal"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                total_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                saturated_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                trans_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                cholesterol: {
+                    unit: {
+                        type: String,
+                        default: "mg"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                carbohydrates: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                natural_sugar: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                added_sugar: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                protein: {
+                    unit: {
+                        type: String,
+                        default: "g"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                },
+
+                sodium: {
+                    unit: {
+                        type: String,
+                        default: "mg"
+                    },
+                    per_100g: {
+                        type: Number,
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
+                    },
+                    rda_percent: {
+                        type: Number,
+                        default: null
+                    }
+                }
+            }
+        },
+
         country_of_origin: {
             type: String,
             default: "India",
@@ -66,15 +348,7 @@ const ComboProductSchema = new mongoose.Schema(
         is_active: {
             type: Boolean,
             default: true
-        },
-
-        // isme us combo product ke sare ComboPack (set of 2, set of 3 etc.) ki ids store hongi
-        setPacks: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "ComboPack"
-            }
-        ]
+        }
     },
     {
         timestamps: true

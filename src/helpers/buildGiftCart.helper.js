@@ -1,61 +1,116 @@
-const calculateGiftTotals = require("./calculateGiftTotals.helper");
+const calculateComboTotals = require("./calculateComboTotals.helper");
+
 
 const buildGiftCart = (
-    giftCart,
+    comboCart,
     catalogMap,
-    giftBoxMap
+    comboPackMap
 ) => {
 
-    if (!giftCart?.items?.length) {
+    if (!comboCart?.items?.length) {
         return [];
     }
 
-    return giftCart.items.map(item => {
 
-        const giftBox = giftBoxMap.get(
-            item.giftBoxId.toString()
+    return comboCart.items.map(item => {
+
+        // =================================================
+        // Get ComboPack
+        // =================================================
+
+        const comboPack = comboPackMap.get(
+            item.setPackId.toString()
         );
 
+
+        if (!comboPack) {
+            return null;
+        }
+
+
+        // =================================================
+        // Calculate Combo Details
+        // =================================================
 
         const {
             products,
             totalWeight,
-            packingPrice,
             totalAmount,
             totalsave
-        } = calculateGiftTotals(
+        } = calculateComboTotals(
+
             item,
+
             catalogMap,
-            giftBoxMap
+
+            comboPack
+
         );
+
+
+        // =================================================
+        // Response
+        // =================================================
 
         return {
 
             type: "CUSTOM",
 
-            giftCartItemId: item._id,
+            comboCartItemId:
+                item._id,
 
-            quantity: item.quantity,
+            quantity:
+                item.quantity,
 
-            giftBox: giftBox
-                ? {
 
-                    _id: giftBox._id,
+            // =================================================
+            // SetPack Information
+            // =================================================
 
-                    name: giftBox.name,
+            setPack: {
 
-                    image: giftBox.image,
+                _id:
+                    comboPack._id,
 
-                    price: giftBox.price
+                comboProductId:
+                    comboPack.comboProductId,
 
-                }
-                : null,
+                pack_name:
+                    comboPack.pack_name,
+
+                pack_size:
+                    comboPack.pack_size,
+
+                mrp:
+                    comboPack.mrp,
+
+                selling_price:
+                    comboPack.selling_price,
+
+                discount_percent:
+                    comboPack.discount_percent,
+
+                image:
+                    comboPack.image,
+
+                public_id:
+                    comboPack.public_id
+
+            },
+
+
+            // =================================================
+            // Products
+            // =================================================
 
             products,
 
-            totalWeight,
 
-            packingPrice,
+            // =================================================
+            // Summary
+            // =================================================
+
+            totalWeight,
 
             totalAmount,
 
@@ -63,7 +118,8 @@ const buildGiftCart = (
 
         };
 
-    });
+    }).filter(Boolean);
+
 };
 
 

@@ -1,6 +1,6 @@
 
 const Cart = require('../models/cart.model')
-const Giftcart = require('../models/giftCart.model')
+const ComboCart = require('../models/ComboCart.model')
 
 
 const removeOrderedItemsFromCart = async (userId, items) => {
@@ -82,7 +82,7 @@ const removeOrderedItemsFromCart = async (userId, items) => {
 
     if (giftCartItemIds.length > 0) {
 
-        const giftCart = await Giftcart.findOneAndUpdate(
+        const comboCart = await ComboCart.findOneAndUpdate(
             {
                 userId
             },
@@ -109,12 +109,12 @@ const removeOrderedItemsFromCart = async (userId, items) => {
         */
 
         if (
-            giftCart &&
-            giftCart.items.length === 0
+            comboCart &&
+            comboCart.items.length === 0
         ) {
 
-            await Giftcart.deleteOne({
-                _id: giftCart._id
+            await ComboCart.deleteOne({
+                _id: comboCart._id
             })
         }
     }

@@ -213,48 +213,29 @@ const checkoutPlan = asyncHandler(async (req, res) => {
     // 11. Create Plan Purchase
     // ─────────────────────────────────────
 
-    const planPurchase =
-        await PurchaseplanDetails.create({
+    const planPurchase = await PurchaseplanDetails.create({
 
             purchase_id,
 
-            userId: user._id,
+            userId:
+                user._id,
 
-            planId: plan._id,
-
-
-            // ─────────────────────────────
-            // Plan Snapshot
-            // ─────────────────────────────
+            planId:
+                plan._id,
 
             plan: {
 
                 name:
                     plan.name,
 
-                plan_image:
-                    plan.image,
-
-                packageLabel:
-                    plan.packageLabel,
-
-                quantityPerJar:
-                    plan.quantityPerJar,
-
-                quantityUnit:
-                    plan.quantityUnit,
-
-                numberOfJars:
-                    plan.numberOfJars,
-
-                totalQuantity:
-                    plan.totalQuantity,
-
-                totalQuantityUnit:
-                    plan.totalQuantityUnit,
+                description:
+                    plan.description || "",
 
                 idealFor:
-                    plan.idealFor,
+                    plan.idealFor || "",
+
+                durationMonths:
+                    plan.durationMonths,
 
                 price:
                     plan.price,
@@ -263,82 +244,49 @@ const checkoutPlan = asyncHandler(async (req, res) => {
                     plan.originalPrice,
 
                 discountPercentage:
-                    plan.discountPercentage,
+                    plan.discountPercentage || 0,
 
                 currency:
-                    plan.currency,
-
-                badge:
-                    plan.badge,
-
-                isPopular:
-                    plan.isPopular,
-
-                durationMonths:
-                    plan.durationMonths,
-
-                deliveriesPerMonth:
-                    plan.deliveriesPerMonth,
-
-                jarsPerDelivery:
-                    plan.jarsPerDelivery
-
+                    plan.currency || "INR"
             },
-
-
-            // ─────────────────────────────
-            // Customer
-            // ─────────────────────────────
 
             customer: {
 
                 name:
-                    customer.name,
+                    customer.name.trim(),
 
                 mobile:
-                    customer.mobile,
+                    customer.mobile.trim(),
 
                 email:
-                    customer.email || ""
-
+                    customer.email?.trim() || ""
             },
-
-
-            // ─────────────────────────────
-            // Address
-            // ─────────────────────────────
 
             shipping_address,
 
             billing_address,
-
-
-            // ─────────────────────────────
-            // Amount
-            // ─────────────────────────────
 
             finalAmount,
 
             currency:
                 plan.currency || "INR",
 
-
-            // ─────────────────────────────
-            // Payment
-            // ─────────────────────────────
-
-            payment_status: "pending",
+            payment_status:
+                "pending",
 
             payment: {},
 
+            status:
+                "pending_payment",
 
-            status: "pending_payment",
-
-            totalDeliveries: plan.durationMonths * plan.deliveriesPerMonth,
+            // Abhi koi delivery create nahi hogi
+            totalDeliveries: 0,
 
             completedDeliveries: 0,
 
-            currentDeliveryNumber: 0
+            currentDeliveryNumber: 0,
+
+            deliveries: []
 
         });
 

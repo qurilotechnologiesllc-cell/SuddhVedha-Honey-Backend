@@ -1,38 +1,70 @@
-const { Schema, model } = require('mongoose')
-const mongoose = require('mongoose')
+const { Schema, model } = require("mongoose");
 
-const cartSchema = new Schema({
+const cartItemSchema = new Schema(
+    {
+        type: {
+            type: String,
+            enum: ["NORMAL", "COMBO"],
+            required: true
+        },
 
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
+        // =========================
+        // NORMAL PRODUCT
+        // =========================
 
-    items: [
-        {
-            productId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'Product',
-                required: [true, 'Product is required']
-            },
+        productId: {
+            type: Schema.Types.ObjectId,
+            ref: "Product"
+        },
 
-            // ✅ Variant add kiya
-            selectedWeight: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'ProductVariant',
-                required: [true, 'Variant is required']
-            },
+        selectedWeight: {
+            type: Schema.Types.ObjectId,
+            ref: "ProductVariant"
+        },
 
-            quantity: {
-                type: Number,
-                required: [true, 'Quantity is required'],
-                min: [1, 'Quantity cannot be less than 1'],
-                default: 1
-            }
+
+        // =========================
+        // COMBO PRODUCT
+        // =========================
+
+        comboProductId: {
+            type: Schema.Types.ObjectId,
+            ref: "ComboProduct"
+        },
+
+
+        // =========================
+        // COMMON
+        // =========================
+
+        quantity: {
+            type: Number,
+            required: true,
+            min: 1,
+            default: 1
         }
-    ]
+    },
+    {
+        _id: true
+    }
+);
 
-}, { timestamps: true })
 
-module.exports = model('Cart', cartSchema)
+const cartSchema = new Schema(
+    {
+        userId: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            unique: true
+        },
+
+        items: [cartItemSchema]
+    },
+    {
+        timestamps: true
+    }
+);
+
+
+module.exports = model("Cart", cartSchema);

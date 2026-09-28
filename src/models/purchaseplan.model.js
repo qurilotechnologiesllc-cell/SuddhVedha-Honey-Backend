@@ -2,16 +2,61 @@ const mongoose = require("mongoose");
 
 const planDeliverySchema = new mongoose.Schema(
     {
-
+        
         // ─────────────────────────────────────
-        // Delivery Number
+        // Combo Set Reference
         // ─────────────────────────────────────
 
-        deliveryNumber: {
-            type: Number,
-            required: true
+        comboSetId: {
+            type: mongoose.Schema.Types.ObjectId,
+            default: null
         },
 
+        // ─────────────────────────────────────
+        // Delivery / Combo Basic Details
+        // Snapshot from PlanComboSet
+        // ─────────────────────────────────────
+
+        monthName: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        title: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        image: {
+            type: String,
+            default: ""
+        },
+
+        season: {
+            type: String,
+            default: "",
+            trim: true
+        },
+
+        harvestTitle: {
+            type: String,
+            default: "",
+            trim: true
+        },
+
+        description: {
+            type: String,
+            default: "",
+            trim: true
+        },
+
+        readMore: {
+            type: String,
+            default: "",
+            trim: true
+        },
 
         // ─────────────────────────────────────
         // Generated Order
@@ -22,36 +67,6 @@ const planDeliverySchema = new mongoose.Schema(
             ref: "Order",
             default: null
         },
-
-
-        // ─────────────────────────────────────
-        // Product sent in this delivery
-        // ─────────────────────────────────────
-
-        products: [
-            {
-                productId: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "Product"
-                },
-
-                variantId: {
-                    type: mongoose.Schema.Types.ObjectId
-                },
-
-                productName: String,
-
-                quantity: {
-                    type: Number,
-                    required: true
-                },
-
-                quantityPerJar: Number,
-
-                quantityUnit: String
-            }
-        ],
-
 
         // ─────────────────────────────────────
         // Delivery Status
@@ -67,20 +82,19 @@ const planDeliverySchema = new mongoose.Schema(
                 "delivered",
                 "cancelled",
                 "returned",
-                "confirmed",
+                "confirmed"
             ],
             default: "pending"
         },
 
-
         // ─────────────────────────────────────
-        // Dates
+        // Scheduled Date
         // ─────────────────────────────────────
 
         scheduledDate: {
             type: Date,
             default: null
-        },
+        }
     },
     {
         _id: true,
@@ -90,22 +104,12 @@ const planDeliverySchema = new mongoose.Schema(
 
 const purchasePlanSchema = new mongoose.Schema(
     {
-
-        // ─────────────────────────────────────
-        // Purchase ID
-        // ─────────────────────────────────────
-
         purchase_id: {
             type: String,
             required: true,
             unique: true,
             index: true
         },
-
-
-        // ─────────────────────────────────────
-        // User
-        // ─────────────────────────────────────
 
         userId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -114,11 +118,6 @@ const purchasePlanSchema = new mongoose.Schema(
             index: true
         },
 
-
-        // ─────────────────────────────────────
-        // Plan
-        // ─────────────────────────────────────
-
         planId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Plans",
@@ -126,53 +125,56 @@ const purchasePlanSchema = new mongoose.Schema(
             index: true
         },
 
-
         // ─────────────────────────────────────
-        // Plan Snapshot
+        // Purchased Plan Snapshot
         // ─────────────────────────────────────
 
         plan: {
 
             name: {
                 type: String,
-                required: true
+                required: true,
+                trim: true
             },
 
-            plan_image: {
+            description: {
                 type: String,
                 default: ""
             },
 
-            packageLabel: String,
+            idealFor: {
+                type: String,
+                default: ""
+            },
 
-            quantityPerJar: Number,
+            durationMonths: {
+                type: Number,
+                required: true
+            },
 
-            quantityUnit: String,
+            price: {
+                type: Number,
+                required: true
+            },
 
-            numberOfJars: Number,
+            originalPrice: {
+                type: Number,
+                required: true
+            },
 
-            totalQuantity: Number,
-
-            totalQuantityUnit: String,
-
-            durationMonths: Number,
-
-            jarsPerDelivery: Number,
-
-            price: Number,
-
-            originalPrice: Number,
+            discountPercentage: {
+                type: Number,
+                default: 0
+            },
 
             currency: {
                 type: String,
                 default: "INR"
             }
-
         },
 
-
         // ─────────────────────────────────────
-        // Customer Details
+        // Customer
         // ─────────────────────────────────────
 
         customer: {
@@ -191,29 +193,17 @@ const purchasePlanSchema = new mongoose.Schema(
                 type: String,
                 default: ""
             }
-
         },
-
-
-        // ─────────────────────────────────────
-        // Shipping Address
-        // ─────────────────────────────────────
 
         shipping_address: {
             type: mongoose.Schema.Types.Mixed,
             required: true
         },
 
-
-        // ─────────────────────────────────────
-        // Billing Address
-        // ─────────────────────────────────────
-
         billing_address: {
             type: mongoose.Schema.Types.Mixed,
             required: true
         },
-
 
         finalAmount: {
             type: Number,
@@ -224,7 +214,6 @@ const purchasePlanSchema = new mongoose.Schema(
             type: String,
             default: "INR"
         },
-
 
         // ─────────────────────────────────────
         // Payment
@@ -297,7 +286,6 @@ const purchasePlanSchema = new mongoose.Schema(
                 mongoose.Schema.Types.Mixed
         },
 
-
         // ─────────────────────────────────────
         // Plan Lifecycle
         // ─────────────────────────────────────
@@ -315,7 +303,6 @@ const purchasePlanSchema = new mongoose.Schema(
             default: "pending_payment",
             index: true
         },
-
 
         // ─────────────────────────────────────
         // Fulfillment
@@ -348,7 +335,6 @@ const purchasePlanSchema = new mongoose.Schema(
         endDate: {
             type: Date
         }
-
     },
     {
         timestamps: true
