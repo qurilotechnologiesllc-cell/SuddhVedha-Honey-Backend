@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+const Category = require('../models/category.model')
 const Product = require('../models/product.model')
 const ProductImage = require("../models/productImage.model")
 const ProductVariant = require('../models/productVariant.model')
@@ -297,7 +299,7 @@ const getProductsByPagination = asyncHandler(async (req, res) => {
         },
         data: products
     })
-})
+});
 
 const getProductById = asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -411,6 +413,7 @@ const updateproductInformation = asyncHandler(async (req, res) => {
         "country_of_origin",
         "fssai_license_number",
         "batch_number",
+        "categoryId",
         "nutrition_info"
     ];
 
@@ -418,10 +421,13 @@ const updateproductInformation = asyncHandler(async (req, res) => {
     const updateData = {};
 
     for (const field of allowedFields) {
+
         if (req.body[field] !== undefined) {
             updateData[field] = req.body[field];
         }
+
     }
+
 
     // Nothing to update
     if (Object.keys(updateData).length === 0) {
@@ -430,6 +436,7 @@ const updateproductInformation = asyncHandler(async (req, res) => {
             message: "Please provide at least one field to update",
         });
     }
+
 
     // Find product
     const product = await Product.findById(productId);
@@ -441,10 +448,48 @@ const updateproductInformation = asyncHandler(async (req, res) => {
         });
     }
 
+
+    // ─────────────────────────────────────────
+    // Validate Category ID
+    // ─────────────────────────────────────────
+
+    if (updateData.categoryId !== undefined) {
+
+        if (
+            !mongoose.Types.ObjectId.isValid(
+                updateData.categoryId
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid categoryId",
+            });
+        }
+
+
+        // Optional but recommended:
+        // Check that category actually exists
+
+        const categoryExists =
+            await Category.findById(
+                updateData.categoryId
+            ).select("_id").lean();
+
+
+        if (!categoryExists) {
+            return res.status(404).json({
+                success: false,
+                message: "Category not found",
+            });
+        }
+    }
+
+
     // Update only provided fields
     Object.assign(product, updateData);
 
     await product.save();
+
 
     return res.status(200).json({
         success: true,
