@@ -14,6 +14,7 @@ const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/st
 const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders');
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler');
 const updateOrderGroupRefundSummary = require('../helpers/updateOrderGroupRefundSummary')
+const redis = require('../utils/redis')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
@@ -656,6 +657,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         orderGroup.orderIds = orderIds;
 
+        await redis.del(`cart:${user._id}`);
 
         await orderGroup.save();
 
@@ -916,6 +918,8 @@ const createOrderByUser = asyncHandler(async (req, res) => {
             order => order._id
         );
 
+
+    await redis.del(`cart:${user._id}`);
 
     await orderGroup.save();
 
@@ -2183,26 +2187,38 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
     // 4. RELEASE RESERVED STOCK
     // ─────────────────────────────────────────
 
+    let inventoryReleased = false;
+
     await Promise.all(
 
         order.items.map(async (item) => {
 
-            // ═════════════════════════════════════
+            // ─────────────────────────────────────────
             // NORMAL ORDER
-            // ═════════════════════════════════════
+            // ─────────────────────────────────────────
 
             if (item.type === "NORMAL") {
 
-                const product = item.product_details?.product;
+                const product =
+                    item.product_details?.product;
 
-                const productId = product?._id;
+                const productId =
+                    product?._id;
 
-                const variantId = product?.variant?._id;
+                const variantId =
+                    product?.variant?._id;
 
-                const reservedQty = Number(item.reserved_quantity || 0);
+                const reservedQty =
+                    Number(
+                        item.reserved_quantity || 0
+                    );
 
 
-                if (!productId || !variantId || reservedQty <= 0) {
+                if (
+                    !productId ||
+                    !variantId ||
+                    reservedQty <= 0
+                ) {
                     return;
                 }
 
@@ -2231,79 +2247,32 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
                 // Reserved quantity release ho gayi
                 item.reserved_quantity = 0;
 
+                inventoryReleased = true;
+
                 return;
             }
 
 
-            // ═════════════════════════════════════
-            // CUSTOM ORDER
-            // ═════════════════════════════════════
+            // ─────────────────────────────────────────
+            // COMBO ORDER
+            // ─────────────────────────────────────────
 
-            if (item.type === "CUSTOM") {
+            if (item.type === "COMBO") {
 
-                const products = item.product_details?.products || [];
-
-
-                await Promise.all(
-
-                    products.map(async (customProduct) => {
-
-                        const productId = customProduct?.productId;
-
-                        const variantId = customProduct?.variant?._id;
-
-                        const reservedQty = Number(customProduct.reserved_quantity ?? customProduct.quantity ?? 0);
-
-
-                        if (!productId || !variantId || reservedQty <= 0) {
-                            return;
-                        }
-
-
-                        await ProductVariant.updateOne(
-                            {
-                                product: productId,
-                                "variants._id": variantId
-                            },
-                            {
-                                $inc: {
-                                    "variants.$[v].available_stock": reservedQty
-                                }
-                            },
-                            {
-                                arrayFilters: [
-                                    {
-                                        "v._id": variantId
-                                    }
-                                ]
-                            }
-                        );
-
-
-                        // Agar reserved_quantity customProduct
-                        // ke andar maintain ho raha hai
-                        if (
-                            customProduct.reserved_quantity !== undefined
-                        ) {
-                            customProduct.reserved_quantity = 0;
-                        }
-
-                    })
-
-                );
-
-
-                // Agar parent CUSTOM item ke andar bhi
-                // reserved_quantity maintain ho raha hai
-                item.reserved_quantity = 0;
+                // Combo ke paas inventory/variant nahi hai.
+                // Isliye kuch bhi update nahi karna.
+                return;
             }
 
-        })
 
+            // CUSTOM intentionally removed
+        })
     );
 
 
-    order.inventory_status = "released";
+    if (inventoryReleased) {
+        order.inventory_status = "released";
+    }
 
 
     // ─────────────────────────────────────────

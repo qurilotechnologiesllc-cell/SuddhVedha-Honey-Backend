@@ -9,7 +9,7 @@ const orderItemSchema = new mongoose.Schema({
 
     type: {
         type: String,
-        enum: ['NORMAL', 'CUSTOM', 'PLAN'],
+        enum: ['NORMAL', 'COMBO', 'PLAN'],
         required: true
     },
 

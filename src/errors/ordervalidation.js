@@ -1,5 +1,11 @@
 const validateOrderItems = (items) => {
 
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Items
+    |--------------------------------------------------------------------------
+    */
+
     if (!Array.isArray(items) || items.length === 0) {
         throw new BadRequestError(
             "Order must contain at least one item"
@@ -7,11 +13,17 @@ const validateOrderItems = (items) => {
     }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Validate Each Item
+    |--------------------------------------------------------------------------
+    */
+
     for (const item of items) {
 
         /*
         |--------------------------------------------------------------------------
-        | 1. Type
+        | Type
         |--------------------------------------------------------------------------
         */
 
@@ -22,7 +34,13 @@ const validateOrderItems = (items) => {
         }
 
 
-        if (!["NORMAL", "CUSTOM"].includes(item.type)) {
+        /*
+        |--------------------------------------------------------------------------
+        | Only NORMAL and COMBO are allowed
+        |--------------------------------------------------------------------------
+        */
+
+        if (!["NORMAL", "COMBO"].includes(item.type)) {
             throw new BadRequestError(
                 `Invalid order item type: ${item.type}`
             );
@@ -31,7 +49,7 @@ const validateOrderItems = (items) => {
 
         /*
         |--------------------------------------------------------------------------
-        | 2. Product Details
+        | Product Details
         |--------------------------------------------------------------------------
         */
 
@@ -48,7 +66,7 @@ const validateOrderItems = (items) => {
 
         /*
         |--------------------------------------------------------------------------
-        | 3. Quantity
+        | Quantity
         |--------------------------------------------------------------------------
         */
 
@@ -64,7 +82,7 @@ const validateOrderItems = (items) => {
 
         /*
         |--------------------------------------------------------------------------
-        | 4. Reserved Quantity
+        | Reserved Quantity
         |--------------------------------------------------------------------------
         */
 
@@ -90,114 +108,103 @@ const validateOrderItems = (items) => {
 
         /*
         |--------------------------------------------------------------------------
-        | 5. Item Final Amount
+        | Item Total Amount
         |--------------------------------------------------------------------------
         */
 
-        const itemFinalAmount = item.product_details.totalAmount;
+        const itemTotalAmount =
+            item.product_details.totalAmount;
 
 
         if (
-            typeof itemFinalAmount !== "number" ||
-            !Number.isFinite(itemFinalAmount) ||
-            itemFinalAmount < 0
+            typeof itemTotalAmount !== "number" ||
+            !Number.isFinite(itemTotalAmount) ||
+            itemTotalAmount < 0
         ) {
             throw new BadRequestError(
-                "Valid finalAmount is required for every order item"
+                "Valid totalAmount is required for every order item"
             );
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | 6. CUSTOM Item
+        | NORMAL Specific Validation
         |--------------------------------------------------------------------------
         */
 
-        if (item.type === "CUSTOM") {
+        if (item.type === "NORMAL") {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Gift Box
-            |--------------------------------------------------------------------------
-            */
+            const product =
+                item.product_details.product;
 
             if (
-                !item.product_details.giftBox ||
-                typeof item.product_details.giftBox !== "object"
+                !product ||
+                typeof product !== "object" ||
+                Array.isArray(product)
             ) {
                 throw new BadRequestError(
-                    "CUSTOM order item must contain giftBox"
+                    "Product details are required for NORMAL order item"
                 );
             }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Products
-            |--------------------------------------------------------------------------
-            */
-
-            if (
-                !Array.isArray(
-                    item.product_details.products
-                ) ||
-                item.product_details.products.length === 0
-            ) {
+            if (!product._id) {
                 throw new BadRequestError(
-                    "CUSTOM order item must contain products"
+                    "Product ID is required for NORMAL order item"
                 );
             }
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Validate Gift Box Products
-            |--------------------------------------------------------------------------
-            */
-
-            for (
-                const product
-                of item.product_details.products
+            if (
+                !product.variant ||
+                typeof product.variant !== "object"
             ) {
-
-                if (!product.productId) {
-                    throw new BadRequestError(
-                        "productId is required for custom product"
-                    );
-                }
-
-
-                if (!product.variant) {
-                    throw new BadRequestError(
-                        "variant is required for custom product"
-                    );
-                }
-
-
-                if (
-                    !Number.isInteger(
-                        product.reserved_quantity
-                    ) ||
-                    product.reserved_quantity < 0
-                ) {
-                    throw new BadRequestError(
-                        "Invalid reserved_quantity in custom product"
-                    );
-                }
-
-
-                if (
-                    product.reserved_quantity >
-                    item.quantity
-                ) {
-                    throw new BadRequestError(
-                        "Custom product reserved_quantity cannot be greater than item quantity"
-                    );
-                }
-
+                throw new BadRequestError(
+                    "Variant is required for NORMAL order item"
+                );
             }
 
+
+            if (!product.variant._id) {
+                throw new BadRequestError(
+                    "Variant ID is required for NORMAL order item"
+                );
+            }
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | COMBO Specific Validation
+        |--------------------------------------------------------------------------
+        |
+        | Combo product does NOT have any stock/variant validation.
+        | We only need the combo product ID.
+        |
+        */
+
+        if (item.type === "COMBO") {
+
+            const product =
+                item.product_details.product;
+
+            if (
+                !product ||
+                typeof product !== "object" ||
+                Array.isArray(product)
+            ) {
+                throw new BadRequestError(
+                    "Product details are required for COMBO order item"
+                );
+            }
+
+
+            if (!product._id) {
+                throw new BadRequestError(
+                    "Combo product ID is required for COMBO order item"
+                );
+            }
         }
 
     }

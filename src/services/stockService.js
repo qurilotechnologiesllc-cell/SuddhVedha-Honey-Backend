@@ -5,83 +5,46 @@ const updateStockAfterOrder = async (items) => {
 
     for (const item of items) {
 
-        // ─────────────────────────────────────────
-        // NORMAL ITEM
-        // ─────────────────────────────────────────
+        /*
+        |--------------------------------------------------------------------------
+        | NORMAL ITEM
+        |--------------------------------------------------------------------------
+        |
+        | Sirf NORMAL product ka stock deduct hoga.
+        |
+        | COMBO product ke paas ProductVariant nahi hai,
+        | isliye uske liye stock deduction nahi hoga.
+        |
+        */
 
-        if (item.type === 'NORMAL') {
-
-            const productId =
-                item.product_details
-                    ?.product?._id;
-
-            const variantId =
-                item.product_details
-                    ?.product?.variant?._id;
-
-            const quantity =
-                item.reserved_quantity || 1;
-
-
-            await deductStock(
-                productId,
-                variantId,
-                quantity
-            );
-
+        if (item.type !== "NORMAL") {
+            continue;
         }
 
 
-        // ─────────────────────────────────────────
-        // CUSTOM GIFT BOX
-        // ─────────────────────────────────────────
-
-        if (item.type === 'CUSTOM') {
-
-            const products =
-                item.product_details
-                    ?.products || [];
-
-            const quantity =
-                item.reserved_quantity || 1;
+        const productId =
+            item.product_details
+                ?.product?._id;
 
 
-            for (const product of products) {
-
-                const productId =
-                    product.productId;
-
-                const variantId =
-                    product.variant?._id;
+        const variantId =
+            item.product_details
+                ?.product?.variant?._id;
 
 
-                /*
-                |--------------------------------------------------------------------------
-                | Important
-                |--------------------------------------------------------------------------
-                |
-                | Gift box quantity = 2
-                |
-                | Every product inside the gift box
-                | needs stock for quantity 2.
-                |
-                */
+        const quantity =
+            item.reserved_quantity || 1;
 
-                await deductStock(
-                    productId,
-                    variantId,
-                    quantity
-                );
 
-            }
-
-        }
-
+        await deductStock(
+            productId,
+            variantId,
+            quantity
+        );
     }
 
 
     return true;
-
 };
 
 // ─── Stock Deduct Helper ──────────────────────────
@@ -97,14 +60,14 @@ const deductStock = async (
 
     const product =
         await Product.findById(productId)
-            .select('variantDocumentId')
+            .select("product_name")
             .lean();
 
 
     if (!product) {
 
         throw new Error(
-            'Product not found'
+            "Product not found"
         );
 
     }
@@ -115,15 +78,15 @@ const deductStock = async (
     // ─────────────────────────────────────────
 
     const variantDoc =
-        await ProductVariant.findById(
-            product.variantDocumentId
-        );
+        await ProductVariant.findOne({
+            product: productId
+        });
 
 
     if (!variantDoc) {
 
         throw new Error(
-            'Product variant not found'
+            `Product variants not found for ${product.product_name}`
         );
 
     }
@@ -144,7 +107,7 @@ const deductStock = async (
     if (!variant) {
 
         throw new Error(
-            'Selected product variant not found'
+            `Selected product variant not found for ${product.product_name}`
         );
 
     }
@@ -160,7 +123,7 @@ const deductStock = async (
     ) {
 
         throw new Error(
-            'Invalid product quantity'
+            "Invalid product quantity"
         );
 
     }
@@ -186,7 +149,8 @@ const deductStock = async (
     // 6. Check Stock After Order
     // ─────────────────────────────────────────
 
-    const remainingStock = variant.available_stock - quantity;
+    const remainingStock =
+        variant.available_stock - quantity;
 
 
     if (
@@ -205,7 +169,8 @@ const deductStock = async (
     // 7. Deduct Stock
     // ─────────────────────────────────────────
 
-    variant.available_stock = remainingStock;
+    variant.available_stock =
+        remainingStock;
 
 
     // ─────────────────────────────────────────
@@ -217,7 +182,7 @@ const deductStock = async (
     ) {
 
         variant.stock_status =
-            'out_of_stock';
+            "out_of_stock";
 
     }
 
@@ -227,14 +192,14 @@ const deductStock = async (
     ) {
 
         variant.stock_status =
-            'low_stock';
+            "low_stock";
 
     }
 
     else {
 
         variant.stock_status =
-            'in_stock';
+            "in_stock";
 
     }
 
@@ -265,63 +230,31 @@ const deductStock = async (
             variant.available_stock
 
     };
-
 };
 
 const checkStockBeforeOrder = async (items) => {
 
     for (const item of items) {
 
-        // ─────────────────────────────
-        // NORMAL
-        // ─────────────────────────────
-
-        if (item.type === "NORMAL") {
-
-            const productId =
-                item.product_details?.product?._id;
-
-            const variantId =
-                item.product_details?.product?.variant?._id;
-
-            const quantity = item.reserved_quantity || 1;
-
-            await checkVariantStock(
-                productId,
-                variantId,
-                quantity
-            );
+        if (item.type !== "NORMAL") {
+            continue;
         }
 
+        const productId =
+            item.product_details?.product?._id;
 
-        // ─────────────────────────────
-        // CUSTOM
-        // ─────────────────────────────
+        const variantId =
+            item.product_details?.product?.variant?._id;
 
-        if (item.type === "CUSTOM") {
-
-            const products =
-                item.product_details?.products || [];
-
-            const quantity =
-                item.reserved_quantity || 1;
+        const quantity =
+            item.reserved_quantity || 1;
 
 
-            for (const product of products) {
-
-                const productId =
-                    product.productId;
-
-                const variantId =
-                    product.variant?._id;
-
-                await checkVariantStock(
-                    productId,
-                    variantId,
-                    quantity
-                );
-            }
-        }
+        await checkVariantStock(
+            productId,
+            variantId,
+            quantity
+        );
     }
 };
 
@@ -334,14 +267,11 @@ const checkVariantStock = async (
 
     const product =
         await Product.findById(productId)
-            .select(
-                "product_name variantDocumentId"
-            )
+            .select("product_name")
             .lean();
 
 
     if (!product) {
-
         throw new BadRequestError(
             "Product not found"
         );
@@ -349,31 +279,44 @@ const checkVariantStock = async (
 
 
     const variantDoc =
-        await ProductVariant.findById(
-            product.variantDocumentId
-        ).lean();
+        await ProductVariant.findOne({
+            product: productId
+        })
+            .select("variants")
+            .lean();
 
 
     if (!variantDoc) {
-
         throw new BadRequestError(
             `Variants not found for ${product.product_name}`
         );
     }
 
 
-    const variant = variantDoc.variants.find(v => v._id.toString() === variantId.toString());
+    const variant =
+        variantDoc.variants.find(
+            v =>
+                v._id.toString() ===
+                variantId.toString()
+        );
 
 
     if (!variant) {
-
         throw new BadRequestError(
             `Selected variant not found for ${product.product_name}`
         );
     }
 
 
-    const availableStock = variant.available_stock;
+    const availableStock =
+        Number(variant.available_stock || 0);
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Stock Availability
+    |--------------------------------------------------------------------------
+    */
 
     if (
         !variant.allow_backorders &&
@@ -392,7 +335,8 @@ const checkVariantStock = async (
     |--------------------------------------------------------------------------
     */
 
-    const remainingStock = availableStock - quantity;
+    const remainingStock =
+        availableStock - quantity;
 
 
     if (
