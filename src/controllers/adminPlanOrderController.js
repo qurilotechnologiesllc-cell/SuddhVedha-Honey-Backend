@@ -502,25 +502,25 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
             carrier_id,
 
         billing_customer_name:
-            order.billing_address?.full_name || "",
+            order.shipping_address?.full_name || "",
 
         billing_last_name:
             "",
 
         billing_address:
-            order.billing_address?.address_line1 || "",
+            order.shipping_address?.address_line1 || "",
 
         billing_city:
-            order.billing_address?.city || "",
+            order.shipping_address?.city || "",
 
         billing_pincode:
-            order.billing_address?.pincode || "",
+            order.shipping_address?.pincode || "",
 
         billing_state:
-            order.billing_address?.state || "",
+            order.shipping_address?.state || "",
 
         billing_country:
-            order.billing_address?.country || "India",
+            order.shipping_address?.country || "India",
 
         billing_email:
             purchase.customer?.email || "",
