@@ -1,123 +1,80 @@
-
-const Cart = require('../models/cart.model')
-const ComboCart = require('../models/ComboCart.model')
-
+const Cart = require("../models/cart.model");
 
 const removeOrderedItemsFromCart = async (userId, items) => {
 
-    const normalCartItemIds = []
-    const giftCartItemIds = []
+    /*
+    |--------------------------------------------------------------------------
+    | Collect cart item IDs from order items
+    |--------------------------------------------------------------------------
+    */
+
+    const cartItemIds = items
+        .map(item => item.product_details?.cartItemId)
+        .filter(Boolean);
 
 
-    for (const item of items) {
+    /*
+    |--------------------------------------------------------------------------
+    | Nothing to remove
+    |--------------------------------------------------------------------------
+    */
 
-        if (item.type === 'NORMAL') {
-
-            normalCartItemIds.push(
-                item.product_details.cartItemId
-            )
-
-        }
-
-        if (item.type === 'CUSTOM') {
-
-            giftCartItemIds.push(
-                item.product_details.giftCartItemId
-            )
-        }
+    if (cartItemIds.length === 0) {
+        return;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Remove NORMAL items
+    | Find user's cart and remove ordered items
     |--------------------------------------------------------------------------
     */
 
-    if (normalCartItemIds.length > 0) {
-
-        const cart = await Cart.findOneAndUpdate(
-            {
-                userId
-            },
-            {
-                $pull: {
-                    items: {
-                        _id: {
-                            $in: normalCartItemIds
-                        }
+    const cart = await Cart.findOneAndUpdate(
+        {
+            userId
+        },
+        {
+            $pull: {
+                items: {
+                    _id: {
+                        $in: cartItemIds
                     }
                 }
-            },
-            {
-                new: true
             }
-        )
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | If cart exists and no items are left,
-        | delete complete cart document
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            cart &&
-            cart.items.length === 0
-        ) {
-
-            await Cart.deleteOne({
-                _id: cart._id
-            })
+        },
+        {
+            new: true
         }
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cart not found
+    |--------------------------------------------------------------------------
+    */
+
+    if (!cart) {
+        return;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | Remove CUSTOM / Gift Cart items
+    | If no items are left,
+    | delete complete cart document
     |--------------------------------------------------------------------------
     */
 
-    if (giftCartItemIds.length > 0) {
+    if (cart.items.length === 0) {
 
-        const comboCart = await ComboCart.findOneAndUpdate(
-            {
-                userId
-            },
-            {
-                $pull: {
-                    items: {
-                        _id: {
-                            $in: giftCartItemIds
-                        }
-                    }
-                }
-            },
-            {
-                new: true
-            }
-        )
+        await Cart.deleteOne({
+            _id: cart._id
+        });
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | If gift cart exists and no items are left,
-        | delete complete gift cart document
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            comboCart &&
-            comboCart.items.length === 0
-        ) {
-
-            await ComboCart.deleteOne({
-                _id: comboCart._id
-            })
-        }
     }
-}
+};
 
-module.exports = removeOrderedItemsFromCart
+
+module.exports = removeOrderedItemsFromCart;

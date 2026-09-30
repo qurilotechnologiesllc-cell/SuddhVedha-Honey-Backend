@@ -215,80 +215,81 @@ const checkoutPlan = asyncHandler(async (req, res) => {
 
     const planPurchase = await PurchaseplanDetails.create({
 
-            purchase_id,
+        purchase_id,
 
-            userId:
-                user._id,
+        userId:
+            user._id,
 
-            planId:
-                plan._id,
+        planId:
+            plan._id,
 
-            plan: {
+        plan: {
 
-                name:
-                    plan.name,
+            name: plan.name,
 
-                description:
-                    plan.description || "",
+            image: plan.image_url,
 
-                idealFor:
-                    plan.idealFor || "",
+            description:
+                plan.description || "",
 
-                durationMonths:
-                    plan.durationMonths,
+            idealFor:
+                plan.idealFor || "",
 
-                price:
-                    plan.price,
+            durationMonths:
+                plan.durationMonths,
 
-                originalPrice:
-                    plan.originalPrice,
+            price:
+                plan.price,
 
-                discountPercentage:
-                    plan.discountPercentage || 0,
+            originalPrice:
+                plan.originalPrice,
 
-                currency:
-                    plan.currency || "INR"
-            },
-
-            customer: {
-
-                name:
-                    customer.name.trim(),
-
-                mobile:
-                    customer.mobile.trim(),
-
-                email:
-                    customer.email?.trim() || ""
-            },
-
-            shipping_address,
-
-            billing_address,
-
-            finalAmount,
+            discountPercentage:
+                plan.discountPercentage || 0,
 
             currency:
-                plan.currency || "INR",
+                plan.currency || "INR"
+        },
 
-            payment_status:
-                "pending",
+        customer: {
 
-            payment: {},
+            name:
+                customer.name.trim(),
 
-            status:
-                "pending_payment",
+            mobile:
+                customer.mobile.trim(),
 
-            // Abhi koi delivery create nahi hogi
-            totalDeliveries: 0,
+            email:
+                customer.email?.trim() || ""
+        },
 
-            completedDeliveries: 0,
+        shipping_address,
 
-            currentDeliveryNumber: 0,
+        billing_address,
 
-            deliveries: []
+        finalAmount,
 
-        });
+        currency:
+            plan.currency || "INR",
+
+        payment_status:
+            "pending",
+
+        payment: {},
+
+        status:
+            "pending_payment",
+
+        // Abhi koi delivery create nahi hogi
+        totalDeliveries: 0,
+
+        completedDeliveries: 0,
+
+        currentDeliveryNumber: 0,
+
+        deliveries: []
+
+    });
 
 
     // ─────────────────────────────────────
@@ -1000,12 +1001,15 @@ const getmyPlanPurchases = asyncHandler(async (req, res) => {
     // 3. Find Plan Purchases
     // ─────────────────────────────────────
 
-    const planPurchases =
-        await PurchaseplanDetails.find({
-
-            userId: user._id
-
-        }).select('-shipping_address -billing_address -payment').sort({ createdAt: -1 });
+    const planPurchases = await PurchaseplanDetails.find({
+        userId: user._id
+    })
+        .select("-shipping_address -billing_address -payment")
+        .populate({
+            path: "deliveries.orderId",
+            select: "order_status -_id"
+        })
+        .sort({ createdAt: -1 });
 
     return res.status(200).json({
 

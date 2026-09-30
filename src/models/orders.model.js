@@ -259,7 +259,8 @@ const orderSchema = new mongoose.Schema({
             'pending',
             'reserved',
             'released',
-            'consumed'
+            'consumed',
+            'not_applicable'
         ],
         default: 'pending'
     },

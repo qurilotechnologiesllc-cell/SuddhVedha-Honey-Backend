@@ -1052,100 +1052,305 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 });
 
 const getMyordersDetails = asyncHandler(async (req, res) => {
-    const { id } = req.user
 
-    // ─── Orders Fetch karo userId se ─────────────
-    const orders = await Order.find({ userId: id })
+    const { id } = req.user;
+
+
+    // ─────────────────────────────────────────
+    // Orders Fetch karo userId se
+    // ─────────────────────────────────────────
+
+    const orders = await Order.find({
+        userId: id
+    })
         .select(
-            'order_id order_group_id items finalAmount shipping_address payment_mode payment_status order_status createdAt'
+            "order_id order_group_id items finalAmount shipping_address payment_mode payment_status order_status createdAt"
         )
-        .sort({ createdAt: -1 }) // ← Latest pehle
+        .sort({
+            createdAt: -1
+        });
+
 
     if (!orders.length) {
         return res.status(200).json({
             success: true,
-            message: 'No orders found',
+            message: "No orders found",
             totalOrders: 0,
             data: []
-        })
+        });
     }
 
-    // ─── Response Format karo ─────────────────────
+
+    // ─────────────────────────────────────────
+    // Response Format
+    // ─────────────────────────────────────────
+
     const formattedOrders = orders.map(order => ({
 
-        // ── Order Info ────────────────────────────
+        // ─────────────────────────────────────
+        // Order Info
+        // ─────────────────────────────────────
+
         _id: order._id,
-        order_group_id: order.order_group_id,
-        order_id: order.order_id,
-        order_status: order.order_status,
-        order_date: order.createdAt,
 
-        // ── Items ─────────────────────────────────
+        order_group_id:
+            order.order_group_id,
+
+        order_id:
+            order.order_id,
+
+        order_status:
+            order.order_status,
+
+        order_date:
+            order.createdAt,
+
+
+        // ─────────────────────────────────────
+        // Items
+        // ─────────────────────────────────────
+
         items: order.items.map(item => ({
-            type: item.type,
-            quantity: item.quantity,
 
-            // Normal Product
-            ...(item.type === 'NORMAL' && {
-                product_name: item.product_details?.product?.product_name,
-                brand: item.product_details?.product?.brand,
-                image: item.product_details?.product?.image,
+            type:
+                item.type,
+
+            quantity:
+                item.quantity,
+
+
+            // ═══════════════════════════════════
+            // NORMAL PRODUCT
+            // ═══════════════════════════════════
+
+            ...(item.type === "NORMAL" && {
+
+                product_name:
+                    item.product_details
+                        ?.product
+                        ?.product_name,
+
+                brand:
+                    item.product_details
+                        ?.product
+                        ?.brand,
+
+                image:
+                    item.product_details
+                        ?.product
+                        ?.image,
+
                 variant: {
-                    weight: item.product_details?.product?.variant?.weight,
-                    price: item.product_details?.product?.variant?.price,
-                    mrp: item.product_details?.product?.variant?.mrp
+
+                    weight:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.weight,
+
+                    price:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.price,
+
+                    mrp:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.mrp
+
                 },
-                amount: item.product_details?.totalAmount
+
+                amount:
+                    item.product_details
+                        ?.totalAmount
             }),
 
-            // Custom Gift Box
-            ...(item.type === 'CUSTOM' && {
-                gift_box: item.product_details?.giftBox?.name,
-                box_image: item.product_details?.giftBox?.image,
-                products: item.product_details?.products,
-                amount: item.product_details?.totalAmount
+
+            // ═══════════════════════════════════
+            // COMBO PRODUCT
+            // ═══════════════════════════════════
+
+            ...(item.type === "COMBO" && {
+
+                product_name:
+                    item.product_details
+                        ?.product
+                        ?.product_name,
+
+                brand:
+                    item.product_details
+                        ?.product
+                        ?.brand,
+
+                image:
+                    item.product_details
+                        ?.product
+                        ?.image,
+
+                comboSets:
+                    item.product_details
+                        ?.product
+                        ?.comboSets,
+
+                variant: {
+
+                    weight:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.weight,
+
+                    price:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.price,
+
+                    mrp:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.mrp
+
+                },
+
+                amount:
+                    item.product_details
+                        ?.totalAmount
             }),
 
-            ...(item.type === 'PLAN' && {
-                product_name: item.product_details?.product?.product_name,
-                brand: item.product_details?.product?.brand,
-                image: item.product_details?.product?.image,
+
+            // ═══════════════════════════════════
+            // PLAN
+            // ═══════════════════════════════════
+            //
+            // Plan ka existing structure same rakha hai.
+            //
+
+            ...(item.type === "PLAN" && {
+
+                product_name:
+                    item.product_details
+                        ?.product
+                        ?.product_name,
+
+                brand:
+                    item.product_details
+                        ?.product
+                        ?.brand,
+
+                image:
+                    item.product_details
+                        ?.product
+                        ?.image,
+
                 variant: {
-                    weight: item.product_details?.product?.variant?.weight,
-                    price: item.product_details?.product?.variant?.price,
-                    mrp: item.product_details?.product?.variant?.mrp
+
+                    weight:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.weight,
+
+                    price:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.price,
+
+                    mrp:
+                        item.product_details
+                            ?.product
+                            ?.variant
+                            ?.mrp
+
                 },
-                amount: item.product_details?.totalAmount
+
+                amount:
+                    item.product_details
+                        ?.totalAmount
             })
+
         })),
 
-        // ── Payment ───────────────────────────────
+
+        // ─────────────────────────────────────────
+        // Payment
+        // ─────────────────────────────────────────
+
         payment: {
-            mode: order.payment_mode,
-            status: order.payment_status,
-            amount: order.finalAmount
+
+            mode:
+                order.payment_mode,
+
+            status:
+                order.payment_status,
+
+            amount:
+                order.finalAmount
         },
 
-        // ── Shipping Address ──────────────────────
-        shipping_address: {
-            full_name: order.shipping_address?.full_name,
-            phone: order.shipping_address?.phone,
-            address_line1: order.shipping_address?.address_line1,
-            address_line2: order.shipping_address?.address_line2,
-            city: order.shipping_address?.city,
-            state: order.shipping_address?.state,
-            pincode: order.shipping_address?.pincode,
-            country: order.shipping_address?.country
-        }
-    }))
 
-    res.status(200).json({
+        // ─────────────────────────────────────────
+        // Shipping Address
+        // ─────────────────────────────────────────
+
+        shipping_address: {
+
+            full_name:
+                order.shipping_address
+                    ?.full_name,
+
+            phone:
+                order.shipping_address
+                    ?.phone,
+
+            address_line1:
+                order.shipping_address
+                    ?.address_line1,
+
+            address_line2:
+                order.shipping_address
+                    ?.address_line2,
+
+            city:
+                order.shipping_address
+                    ?.city,
+
+            state:
+                order.shipping_address
+                    ?.state,
+
+            pincode:
+                order.shipping_address
+                    ?.pincode,
+
+            country:
+                order.shipping_address
+                    ?.country
+        }
+
+    }));
+
+
+    return res.status(200).json({
+
         success: true,
-        message: 'Orders fetched successfully',
-        totalOrders: formattedOrders.length,
-        data: formattedOrders
-    })
-})
+
+        message:
+            "Orders fetched successfully",
+
+        totalOrders:
+            formattedOrders.length,
+
+        data:
+            formattedOrders
+
+    });
+
+});
 
 const razorpayWebhooks = asyncHandler(async (req, res) => {
 

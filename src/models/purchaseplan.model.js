@@ -2,10 +2,15 @@ const mongoose = require("mongoose");
 
 const planDeliverySchema = new mongoose.Schema(
     {
-        
+
         // ─────────────────────────────────────
         // Combo Set Reference
         // ─────────────────────────────────────
+        deliveryNumber: {
+            type: Number,
+            default: 0,
+            required: true
+        },
 
         comboSetId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -69,25 +74,6 @@ const planDeliverySchema = new mongoose.Schema(
         },
 
         // ─────────────────────────────────────
-        // Delivery Status
-        // ─────────────────────────────────────
-
-        status: {
-            type: String,
-            enum: [
-                "pending",
-                "processing",
-                "packed",
-                "shipped",
-                "delivered",
-                "cancelled",
-                "returned",
-                "confirmed"
-            ],
-            default: "pending"
-        },
-
-        // ─────────────────────────────────────
         // Scheduled Date
         // ─────────────────────────────────────
 
@@ -135,6 +121,11 @@ const purchasePlanSchema = new mongoose.Schema(
                 type: String,
                 required: true,
                 trim: true
+            },
+
+            image: {
+                type: String,
+                required: true,
             },
 
             description: {

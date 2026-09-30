@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/orders.model");
 const OrderGroup = require("../models/orderGoup.model");
 const VelocitySchema = require('../models/velocityOrder.model')
+const PurchasePlanDetails = require("../models/purchaseplan.model");
 const axios = require("axios");
 const { checkDeliveryAvailabilityService } = require("../services/delivery.service");
 
@@ -247,11 +248,7 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
       const product = productDetails.product || {};
       const variant = product.variant || {};
 
-      const sellingPrice = Number(
-        variant.price ||
-        productDetails.finalAmount ||
-        0
-      );
+      const sellingPrice = Number(productDetails.totalAmount || 0);
 
       const discount = Number(
         productDetails.couponDiscount || 0
@@ -515,9 +512,6 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
     data: {
 
       velocityOrder,
-
-      velocityResponse:
-        velocityData,
 
       orderSummary: {
 
@@ -787,33 +781,109 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
 
       if (orderIds.length > 0) {
 
-        const orderUpdateResult =
-          await Order.updateMany(
-            {
-              _id: {
-                $in: orderIds,
-              },
-            },
-            {
-              $set: {
-                order_status:
-                  velocityStatus,
-              },
-            }
-          );
+        const orders = await Order.find({
+          _id: {
+            $in: orderIds,
+          },
+        }).select("_id order_status plan_purchase_id");
 
-        console.log(
-          "Order status updated:",
-          {
-            status: velocityStatus,
-            orderIds,
-            matchedCount:
-              orderUpdateResult.matchedCount,
-            modifiedCount:
-              orderUpdateResult.modifiedCount,
+        if (orders.length > 0) {
+
+          for (const order of orders) {
+
+            const previousOrderStatus = order.order_status;
+
+            // -----------------------------------------
+            // Update Order Status
+            // -----------------------------------------
+
+            order.order_status = velocityStatus;
+
+            await order.save();
+
+            console.log("Order status updated:", {
+              orderId: order._id,
+              previousStatus: previousOrderStatus,
+              newStatus: velocityStatus,
+            });
+
+            // -----------------------------------------
+            // PLAN DELIVERY COMPLETION
+            // -----------------------------------------
+
+            if (
+              velocityStatus === "delivered" &&
+              previousOrderStatus !== "delivered" &&
+              order.plan_purchase_id
+            ) {
+
+              const purchase = await PurchasePlanDetails.findById(
+                order.plan_purchase_id
+              );
+
+              if (!purchase) {
+
+                console.warn(
+                  "Purchase plan not found for delivered order",
+                  {
+                    orderId: order._id,
+                    planPurchaseId: order.plan_purchase_id,
+                  }
+                );
+
+                continue;
+              }
+
+              // -----------------------------------------
+              // Prevent completedDeliveries overflow
+              // -----------------------------------------
+
+              const totalDeliveries =
+                Number(purchase.totalDeliveries || 0);
+
+              const completedDeliveries =
+                Number(purchase.completedDeliveries || 0);
+
+              // -----------------------------------------
+              // Increment completed deliveries
+              // -----------------------------------------
+
+              if (totalDeliveries === 0 || completedDeliveries < totalDeliveries) {
+
+                purchase.completedDeliveries = completedDeliveries + 1;
+
+                await purchase.save();
+
+                console.log(
+                  "Plan completedDeliveries updated:",
+                  {
+                    planPurchaseId:
+                      purchase._id,
+                    orderId: order._id,
+                    completedDeliveries:
+                      purchase.completedDeliveries,
+                    totalDeliveries:
+                      purchase.totalDeliveries,
+                  }
+                );
+              } else {
+
+                console.warn(
+                  "completedDeliveries already reached totalDeliveries",
+                  {
+                    planPurchaseId:
+                      purchase._id,
+                    completedDeliveries,
+                    totalDeliveries,
+                  }
+                );
+              }
+            }
           }
-        );
+        }
+
       } else {
+
         console.warn(
           "No orderIds found in VelocityOrder",
           {

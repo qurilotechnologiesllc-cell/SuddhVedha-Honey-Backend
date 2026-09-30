@@ -3,8 +3,10 @@ const axios = require('axios')
 const Order = require("../models/orders.model");
 const Ordergroup = require('../models/orderGoup.model')
 const PurchasePlanDetails = require("../models/purchaseplan.model");
+const PlanComboSet = require('../models/PlanComboSet.model')
 const Products = require('../models/product.model')
 const VelocitySchema = require('../models/velocityOrder.model')
+const Plans = require('../models/plans.models')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
 const { sendnotificationEmailToUser } = require('../utils/sendEmail')
 
@@ -66,12 +68,15 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
     const { role } = req.user;
 
     if (role !== "admin") {
-        throw new ForbiddenError("Access denied. Admins only.");
+        throw new ForbiddenError(
+            "Access denied. Admins only."
+        );
     }
+
 
     const {
         planPurchaseId,
-        items,
+        comboSetId,
         plan_delivery_date,
         carrier_id,
         length,
@@ -86,77 +91,43 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
     // ─────────────────────────────────────────
 
     if (!planPurchaseId) {
-
         throw new BadRequestError(
             "Plan purchase id is required"
         );
-
     }
 
 
     // ─────────────────────────────────────────
-    // 2. Validate Items
+    // 2. Validate Combo Set ID
     // ─────────────────────────────────────────
 
-    if (
-        !Array.isArray(items) ||
-        items.length === 0
-    ) {
-
+    if (!comboSetId) {
         throw new BadRequestError(
-            "At least one product is required"
+            "Combo set id is required"
         );
-
     }
 
 
     // ─────────────────────────────────────────
-    // 3. Validate PLAN Items
+    // 3. Validate Delivery Date
     // ─────────────────────────────────────────
 
-    for (const item of items) {
+    let deliveryDate = null;
 
-        if (item.type !== "PLAN") {
+    if (plan_delivery_date) {
 
-            throw new BadRequestError(
-                "Only PLAN items are allowed for plan delivery"
-            );
-
-        }
+        deliveryDate =
+            new Date(plan_delivery_date);
 
         if (
-            !item.product_details ||
-            typeof item.product_details !== "object"
+            Number.isNaN(
+                deliveryDate.getTime()
+            )
         ) {
-
             throw new BadRequestError(
-                "Product details are required"
+                "Invalid plan delivery date"
             );
-
         }
-
-        if (
-            !Number.isInteger(item.quantity) ||
-            item.quantity < 1
-        ) {
-
-            throw new BadRequestError(
-                "Invalid product quantity"
-            );
-
-        }
-
-        if (
-            !Number.isInteger(item.reserved_quantity) ||
-            item.reserved_quantity < 0
-        ) {
-
-            throw new BadRequestError(
-                "Invalid reserved quantity"
-            );
-
-        }
-
     }
 
 
@@ -168,17 +139,16 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
         .findById(planPurchaseId)
         .populate({
             path: "planId",
-            select: "name description packageLabel"
+            select: "name description"
         });
 
+    console.log(purchase)
 
 
     if (!purchase) {
-
         throw new NotFoundError(
             "Plan purchase not found"
         );
-
     }
 
 
@@ -187,29 +157,10 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
     // ─────────────────────────────────────────
 
     if (purchase.status !== "active") {
-
         throw new BadRequestError(
             `Plan is not active. Current status: ${purchase.status}`
         );
-
     }
-
-
-    // ─────────────────────────────────────────
-    // 6. Check Delivery Limit
-    // ─────────────────────────────────────────
-
-    if (
-        purchase.currentDeliveryNumber >=
-        purchase.totalDeliveries
-    ) {
-
-        throw new BadRequestError(
-            "All plan deliveries have already been completed"
-        );
-
-    }
-
 
     // ─────────────────────────────────────────
     // 7. Calculate Next Delivery Number
@@ -231,134 +182,281 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
 
 
     if (existingDelivery) {
-
         throw new ConflictError(
             `Delivery ${nextDeliveryNumber} has already been created`
         );
-
     }
 
 
     // ─────────────────────────────────────────
-    // 9. Validate Delivery Date
+    // 9. Find Plan Combo Set
     // ─────────────────────────────────────────
 
-    let deliveryDate = null;
+    const planComboSet = await PlanComboSet.findOne({
+        planId: purchase.planId,
+        "combosets._id": comboSetId
+    }).lean();
 
-    if (plan_delivery_date) {
 
-        deliveryDate =
-            new Date(plan_delivery_date);
-
-        if (
-            Number.isNaN(
-                deliveryDate.getTime()
-            )
-        ) {
-
-            throw new BadRequestError(
-                "Invalid plan delivery date"
-            );
-
-        }
-
+    if (!planComboSet) {
+        throw new NotFoundError(
+            "Selected combo set not found for this plan"
+        );
     }
 
 
     // ─────────────────────────────────────────
-    // 10. Generate Order ID
+    // 10. Find Selected Combo Set
     // ─────────────────────────────────────────
 
-    const order_id = generateOrderId();
-
-    const orderAmount = items.reduce(
-        (total, item) => {
-
-            return (
-                total +
-                Number(
-                    item.product_details?.totalAmount || 0
-                )
-            );
-
-        },
-        0
+    const selectedComboSet = planComboSet?.combosets?.find(
+        combo => combo._id.toString() === comboSetId.toString()
     );
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORTANT
+    |--------------------------------------------------------------------------
+    |
+    | Agar PlanComboSet collection ka document khud
+    | ek comboSet hai, aur uske andar products hain,
+    | to selectedComboSet ki zarurat nahi hogi.
+    |
+    | Us case mein:
+    |
+    | selectedComboSet = planComboSet
+    |
+    |--------------------------------------------------------------------------
+    */
+
+
+    if (!selectedComboSet) {
+        throw new NotFoundError(
+            "Selected combo set details not found"
+        );
+    }
+
+
     // ─────────────────────────────────────────
-    // 11. Create Plan Order
+    // 11. Validate Combo Products
     // ─────────────────────────────────────────
 
-    const order = await Order.create({
-
-        order_id,
-
-        userId:
-            purchase.userId,
-
-        order_group_id:
-            null,
-
-        plan_purchase_id:
-            purchase._id,
-
-        plan_delivery_number:
-            nextDeliveryNumber,
-
-        plan_delivery_date:
-            deliveryDate,
-
-        items,
+    if (
+        !Array.isArray(selectedComboSet.products) ||
+        selectedComboSet.products.length === 0
+    ) {
+        throw new BadRequestError(
+            "Selected combo set does not contain any products"
+        );
+    }
 
 
-        totalAmount: orderAmount,
+    // ─────────────────────────────────────────
+    // 12. Calculate Total Weight
+    // ─────────────────────────────────────────
 
-        shipping_address:
-            purchase.shipping_address,
+    const totalWeight =
+        selectedComboSet.products.reduce(
+            (total, product) =>
+                total +
+                Number(product.weight || 0),
+            0
+        );
 
-        billing_address:
-            purchase.billing_address,
 
-        payment_mode:
-            purchase.payment_mode,
+    // ─────────────────────────────────────────
+    // 13. Build PLAN Order Item
+    // ─────────────────────────────────────────
 
-        payment_status: purchase.payment_status,
+    const items = [
+        {
+            type: "PLAN",
 
-        payment:
-            purchase.payment,
+            product_details: {
 
-        order_status:
-            "processing",
+                product: {
 
-        inventory_status:
-            "reserved",
+                    _id:
+                        selectedComboSet._id,
 
-        customer_note:
-            "",
+                    product_name:
+                        selectedComboSet.title,
 
-        admin_note:
-            ""
+                    brand:
+                        "SudhVeda Honey",
 
-    });
+                    product_type:
+                        "plan_combo",
+
+                    image: {
+                        image_url:
+                            selectedComboSet.image || "",
+
+                        public_id:
+                            selectedComboSet.public_id || ""
+                    },
+
+                    comboSets:
+                        selectedComboSet.products
+                            .map(product => ({
+                                name:
+                                    product.name,
+
+                                weight:
+                                    product.weight,
+
+                                unit:
+                                    product.unit
+                            }))
+                },
+
+                totalAmount:
+                    Number(purchase.finalAmount || 0),
+
+                totalWeight,
+
+                totalWeightUnit:
+                    "g",
+
+                totalsave:
+                    0
+            },
+
+            quantity: 1,
+
+            reserved_quantity: 0
+        }
+    ];
+
+
+    // ─────────────────────────────────────────
+    // 14. Generate Order ID
+    // ─────────────────────────────────────────
+
+    const order_id =
+        generateOrderId();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Plan delivery order ka amount actual combo ka price nahi hoga.
+    |
+    | Customer already plan purchase ke time payment kar chuka hai.
+    |
+    | Isliye order amount = purchased plan amount.
+    |--------------------------------------------------------------------------
+    */
+
+    const orderAmount =
+        Number(
+            purchase.finalAmount || 0
+        );
+
+
+    // ─────────────────────────────────────────
+    // 15. Create Order
+    // ─────────────────────────────────────────
+
+    const order =
+        await Order.create({
+
+            order_id,
+
+            userId:
+                purchase.userId,
+
+            order_group_id:
+                null,
+
+            plan_purchase_id:
+                purchase._id,
+
+            plan_delivery_number:
+                nextDeliveryNumber,
+
+            plan_delivery_date:
+                deliveryDate,
+
+            items,
+
+            totalAmount:
+                orderAmount,
+
+            shipping_address:
+                purchase.shipping_address,
+
+            billing_address:
+                purchase.billing_address,
+
+            payment_mode:
+                purchase.payment_mode,
+
+            payment_status:
+                purchase.payment_status,
+
+            payment:
+                purchase.payment,
+
+            order_status:
+                "processing",
+
+            inventory_status: "not_applicable",
+
+            customer_note:
+                "",
+
+            admin_note:
+                ""
+        });
+
+
+    // ─────────────────────────────────────────
+    // 16. Create Order Group
+    // ─────────────────────────────────────────
 
     const group_id = generateOrderGroupId();
 
+
     const orderGroup =
         await Ordergroup.create({
+
             group_id,
-            userId: purchase.userId,
+
+            userId:
+                purchase.userId,
+
             orderIds: [
                 order._id
             ],
-            totalAmount: orderAmount,
 
-            finalAmount: orderAmount,
-            cod_amount: purchase.payment_mode === "cod" ? orderAmount : 0,
-            length: Number(length || 0),
-            breadth: Number(breadth || 0),
-            height: Number(height || 0),
-            weight: Number(weight || 0),
+            totalAmount:
+                orderAmount,
+
+            finalAmount:
+                orderAmount,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Plan already paid.
+            | Customer se COD collect nahi karna.
+            |--------------------------------------------------------------------------
+            */
+
+            cod_amount:
+                0,
+
+            length:
+                Number(length || 0),
+
+            breadth:
+                Number(breadth || 0),
+
+            height:
+                Number(height || 0),
+
+            weight:
+                Number(weight || totalWeight / 1000),
 
             coupon: {
                 offerId: null,
@@ -367,19 +465,32 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
                 discountValue: 0,
                 discountAmount: 0
             },
-            payment_mode: purchase.payment_mode,
-            payment_status: purchase.payment_status,
-            payment: purchase.payment
+
+            payment_mode:
+                purchase.payment_mode,
+
+            payment_status:
+                purchase.payment_status,
+
+            payment:
+                purchase.payment
         });
+
 
     order.order_group_id = orderGroup._id;
 
+
+    await order.save();
+
+
     // ─────────────────────────────────────────
-    // 11.1 Prepare Velocity Payload
+    // 17. Velocity Payload
     // ─────────────────────────────────────────
+
     const velocityPayload = {
 
-        order_id: orderGroup.group_id,
+        order_id:
+            orderGroup.group_id,
 
         order_date:
             new Date(order.createdAt)
@@ -417,48 +528,60 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
         billing_phone:
             order.billing_address?.phone || "",
 
-        shipping_is_billing: true,
+        shipping_is_billing:
+            true,
 
         print_label:
             true,
 
+
+        // ─────────────────────────────────────
+        // Products inside selected combo set
+        // ─────────────────────────────────────
+
         order_items:
-            order.items.map(item => {
+            selectedComboSet.products.map(
+                product => ({
 
-                const product =
-                    item.product_details?.product;
-
-                const variant =
-                    product?.variant;
-
-                return {
-
-                    name:
-                        product?.product_name || "",
+                    name: product.name,
 
                     sku:
-                        variant?._id || "",
+                        `${comboSetId}-${product.name
+                            .replace(/\s+/g, "-")
+                            .toUpperCase()}`,
 
-                    units:
-                        Number(item.quantity || 0),
+                    units: 1,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Product individually charge nahi ho raha.
+                    | Plan already prepaid hai.
+                    |--------------------------------------------------------------------------
+                    */
 
                     selling_price:
-                        Number(variant?.price || 0),
+                        0,
 
-                    discount:
-                        Number(
-                            item.product_details?.totalsave || 0
-                        )
-                };
-            }),
+                    discount: 0
+                })
+            ),
 
-        payment_method: "PREPAID",
+
+        // ─────────────────────────────────────
+        // Plan already paid
+        // ─────────────────────────────────────
+
+        payment_method:
+            "PREPAID",
 
         sub_total:
-            Number(order.totalAmount || 0),
+            Number(
+                purchase.finalAmount || 0
+            ),
 
         cod_collectible:
             0,
+
 
         length:
             Number(length || 0),
@@ -470,164 +593,233 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
             Number(height || 0),
 
         weight:
-            Number(weight || 0),
+            Number(
+                weight || (totalWeight / 1000)
+            ),
 
-        pickup_location: "HomeNew",
+
+        pickup_location:
+            "HomeNew",
 
         warehouse_id:
             process.env.VELOCITY_WAREHOUSE_ID,
 
+
         vendor_details: {
 
-            email: "shuddhvedahoney@gmail.com",
+            email:
+                "shuddhvedahoney@gmail.com",
 
-            phone: "8175022207",
+            phone:
+                "8175022207",
 
-            name: "ShuddhVeda Honey",
+            name:
+                "ShuddhVeda Honey",
 
-            address: "Rz-91/2, First Floor, Mohan Garden, Opposite Metro Pillar 745",
+            address:
+                "Rz-91/2, First Floor, Mohan Garden, Opposite Metro Pillar 745",
 
-            address_2: "",
+            address_2:
+                "",
 
-            city: "Delhi",
+            city:
+                "Delhi",
 
-            state: "Delhi",
+            state:
+                "Delhi",
 
-            country: "India",
+            country:
+                "India",
 
-            pin_code: "110059",
+            pin_code:
+                "110059",
 
-            pickup_location: "HomeNew"
+            pickup_location:
+                "HomeNew"
         }
     };
 
-    const velocityResult = await createOrderOnVelocity({
-        payload: velocityPayload,
-        orderGroupId: orderGroup._id,
-        orderIds: [order._id],
-        merchantOrderId: orderGroup.group_id
-    });
+
+    // ─────────────────────────────────────────
+    // 18. Create Velocity Order
+    // ─────────────────────────────────────────
+
+    const velocityResult =
+        await createOrderOnVelocity({
+
+            payload:
+                velocityPayload,
+
+            orderGroupId:
+                orderGroup._id,
+
+            orderIds: [
+                order._id
+            ],
+
+            merchantOrderId:
+                orderGroup.group_id
+        });
 
 
     if (!velocityResult.success) {
-        return res.status(velocityResult.error?.status || 500).json({
-            success: false, message: "Order created locally but Velocity order creation failed",
-            error: velocityResult.error,
-            velocityResponse: velocityResult.velocityResponse,
-            velocityOrder: velocityResult.velocityOrder
+
+        return res.status(
+            velocityResult.error?.status || 500
+        ).json({
+
+            success: false,
+
+            message:
+                "Order created locally but Velocity order creation failed",
+
+            error:
+                velocityResult.error,
+
+            velocityResponse:
+                velocityResult.velocityResponse,
+
+            velocityOrder:
+                velocityResult.velocityOrder
         });
     }
+
+
+    // ─────────────────────────────────────────
+    // 19. Confirm Order
+    // ─────────────────────────────────────────
 
     order.order_status = "confirmed";
 
     await order.save();
 
+
     // ─────────────────────────────────────────
-    // 12. Create Delivery History Entry
+    // 20. Create Delivery History
     // ─────────────────────────────────────────
 
     const delivery = {
 
-        deliveryNumber:
-            nextDeliveryNumber,
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT
+        |--------------------------------------------------------------------------
+        | Agar aapke schema mein deliveryNumber field nahi hai,
+        | to schema mein add karna padega.
+        |--------------------------------------------------------------------------
+        */
 
-        orderId:
-            order._id,
+        deliveryNumber: nextDeliveryNumber,
 
-        status: order.order_status,
+        comboSetId:
+            selectedComboSet._id,
 
-        scheduledDate: deliveryDate,
+        monthName:
+            selectedComboSet.monthName,
 
-        shippedAt: null,
+        title:
+            selectedComboSet.title,
 
-        deliveredAt: null,
+        image:
+            selectedComboSet.image || "",
 
-        products:
-            items.map(item => ({
+        season:
+            selectedComboSet.season || "",
 
-                productId:
-                    item.product_details
-                        ?.product?._id,
+        harvestTitle:
+            selectedComboSet.harvestTitle || "",
 
-                variantId:
-                    item.product_details
-                        ?.product?.variant?._id,
+        description:
+            selectedComboSet.description || "",
 
-                productName:
-                    item.product_details
-                        ?.product?.product_name,
+        readMore:
+            selectedComboSet.readMore || "",
 
-                quantity:
-                    item.quantity,
+        orderId: order._id,
 
-                quantityPerJar:
-                    item.product_details
-                        ?.product?.variant?.weight,
 
-                quantityUnit:
-                    item.product_details
-                        ?.product?.variant?.unit || "g"
-
-            }))
-
+        scheduledDate: deliveryDate
     };
 
 
     // ─────────────────────────────────────────
-    // 13. Push Delivery
+    // 21. Update Purchase Plan
     // ─────────────────────────────────────────
 
     purchase.deliveries.push(delivery);
 
-
-    // ─────────────────────────────────────────
-    // 14. Update Current Delivery
-    // ─────────────────────────────────────────
-
     purchase.currentDeliveryNumber = nextDeliveryNumber;
 
-
-    // NOTE:
-    // completedDeliveries will be updated
-    // only after actual successful delivery.
+    purchase.totalDeliveries = nextDeliveryNumber;
 
     await purchase.save();
 
     const userInfo = {
         email: purchase.customer?.email,
         name: purchase.customer?.name
-    }
+    };
 
     const products = items.map((item) => {
         const product = item.product_details?.product;
-        const variant = product?.variant;
+
+        const totalWeight = Number(item.product_details?.totalWeight || 0);
+        const totalWeightUnit = item.product_details?.totalWeightUnit || "g";
+
         return {
             productName: product?.product_name || "Product",
             quantity: item.quantity || 0,
-            weight: variant?.weight ? `${variant.weight}${variant.unit || "g"}` : "",
-            productDescription: product?.description || ""
+            weight: totalWeight
+                ? `${totalWeight}${totalWeightUnit}`
+                : "",
+            productDescription: product?.product_type || "",
+            comboSets: product?.comboSets || []
         };
     });
 
     const orderdetails = {
-        customerName: purchase.customer?.name,
-        planName: purchase.planId.name,
+        customerName: purchase.customer?.name || "",
+
+        // Plan snapshot from PurchasePlan
+        planName: purchase.plan?.name || "",
+
         orderId: order_id,
-        orderDate: new Date(order.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+
+        orderDate: new Date(order.createdAt).toLocaleDateString(
+            "en-IN",
+            {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            }
+        ),
+
+        // Plan delivery order amount
         totalAmount: orderAmount,
+
+        // Selected Plan ComboSet
         productName: products[0]?.productName || "",
+
         quantity: products[0]?.quantity?.toString() || "",
+
+        // 1000g
         weight: products[0]?.weight || "",
-        productDescription: purchase.planId.description,
+
+        // Plan description
+        productDescription: purchase.plan?.description || "",
+
         deliveryDate: plan_delivery_date,
-        deliveryAddress: purchase.shipping_address
-    }
+
+        deliveryAddress: purchase.shipping_address,
+
+        // New combo-set products
+        comboSets: products[0]?.comboSets || []
+    };
 
     const result = await sendnotificationEmailToUser(userInfo, orderdetails)
 
 
     // ─────────────────────────────────────────
-    // 15. Response
+    // 22. Response
     // ─────────────────────────────────────────
 
     return res.status(201).json({
@@ -660,11 +852,8 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
             items:
                 order.items,
 
-            shipping_address:
-                order.shipping_address,
-
-            billing_address:
-                order.billing_address,
+            totalAmount:
+                order.totalAmount,
 
             payment_mode:
                 order.payment_mode,
@@ -677,23 +866,6 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
 
             inventory_status:
                 order.inventory_status
-
-        },
-
-        orderGroup: {
-            _id: orderGroup._id,
-            group_id: orderGroup.group_id,
-            userId: orderGroup.userId,
-            orderIds: orderGroup.orderIds,
-            totalAmount: orderGroup.totalAmount,
-            finalAmount: orderGroup.finalAmount,
-            cod_amount: orderGroup.cod_amount,
-            length: orderGroup.length,
-            breadth: orderGroup.breadth,
-            height: orderGroup.height,
-            weight: orderGroup.weight,
-            payment_mode: orderGroup.payment_mode,
-            payment_status: orderGroup.payment_status
         },
 
         plan: {
@@ -709,8 +881,9 @@ const createPlanDeliveryOrderOnVelocity = asyncHandler(async (req, res) => {
 
             totalDeliveries:
                 purchase.totalDeliveries
+        },
 
-        }
+        velocityData: velocityResult
 
     });
 
@@ -801,60 +974,62 @@ const createOrderOnVelocity = async ({
 };
 
 
-const getproductDetails = asyncHandler(async (req, res) => {
-    const { role } = req.user
+const getPlansCombosets = asyncHandler(async (req, res) => {
+
+    const { role } = req.user;
 
     if (role !== "admin") {
-        throw new ForbiddenError("Access denied. Admins only.");
+        throw new ForbiddenError(
+            "Access denied. Admins only."
+        );
     }
 
-    const products = await Products.find({ is_active: true })
+
+    const { planId } = req.params;
+
+    if (!planId) {
+        throw new BadRequestError(
+            "planId is required"
+        );
+    }
+
+
+    const plan = await Plans.findById(planId)
         .populate({
-            path: 'categoryId',
-            select: 'category_name description slug -_id'
+            path: "comboSetId"
         })
-        .populate({
-            path: 'variantDocumentId',
-            select: 'variants -_id'
-        })
-        .populate({
-            path: 'imageDocumentId',
-            select: 'images -_id'
-        })
-        .select('-videoDocumentId -createdAt -__v')
         .lean();
 
 
+    if (!plan) {
+        throw new NotFoundError(
+            "Plan not found"
+        );
+    }
 
-    // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li
-    const formattedProducts = products.map(product => {
-        let singleImage = null;
-        let singleVariant = null;
 
-        // Check kiya ki images object aur uske andar ka images array exist karta hai ya nahi
-        if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
-            singleImage = product.imageDocumentId.images[0]; // Sirf pehla image object uthaya
-        }
-        // Variants array se 1st variant nikala
-        if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
-            singleVariant = product.variantDocumentId.variants;
-        }
+    if (!plan.comboSetId) {
+        throw new NotFoundError(
+            "Combo set not found for this plan"
+        );
+    }
 
-        return {
-            ...product,
-            imageDocumentId: singleImage, // Pura object hata kar sirf single image object set kar diya
-            variantDocumentId: singleVariant
-        };
-    });
 
-    res.status(200).json({
+    return res.status(200).json({
+
         success: true,
-        data: formattedProducts // Modified data bheja
+
+        message:
+            "Plan combo sets fetched successfully",
+
+        data:
+            plan.comboSetId
+
     });
 });
 
 module.exports = {
     getAllpurchasePlansbyUser,
     createPlanDeliveryOrderOnVelocity,
-    getproductDetails
+    getPlansCombosets
 };

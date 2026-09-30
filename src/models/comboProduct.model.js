@@ -130,13 +130,13 @@ const ComboProductSchema = new mongoose.Schema(
 
                 unit: {
                     type: String,
-                    default: "tbsp",
+                    default: "serving",
                     trim: true
                 },
 
                 weight_g: {
                     type: Number,
-                    default: 21
+                    default: 20
                 }
             },
 
@@ -153,86 +153,6 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
-                    }
-                },
-
-                total_fat: {
-                    unit: {
-                        type: String,
-                        default: "g"
-                    },
-                    per_100g: {
-                        type: Number,
-                        default: 0
-                    },
-                    per_serving: {
-                        type: Number,
-                        default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
-                    }
-                },
-
-                saturated_fat: {
-                    unit: {
-                        type: String,
-                        default: "g"
-                    },
-                    per_100g: {
-                        type: Number,
-                        default: 0
-                    },
-                    per_serving: {
-                        type: Number,
-                        default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
-                    }
-                },
-
-                trans_fat: {
-                    unit: {
-                        type: String,
-                        default: "g"
-                    },
-                    per_100g: {
-                        type: Number,
-                        default: 0
-                    },
-                    per_serving: {
-                        type: Number,
-                        default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
-                    }
-                },
-
-                cholesterol: {
-                    unit: {
-                        type: String,
-                        default: "mg"
-                    },
-                    per_100g: {
-                        type: Number,
-                        default: 0
-                    },
-                    per_serving: {
-                        type: Number,
-                        default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
                     }
                 },
 
@@ -248,14 +168,10 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
                     }
                 },
 
-                natural_sugar: {
+                total_sugar: {
                     unit: {
                         type: String,
                         default: "g"
@@ -267,10 +183,6 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
                     }
                 },
 
@@ -286,10 +198,6 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
                     }
                 },
 
@@ -305,10 +213,21 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
+                    }
+                },
+
+                total_fat: {
+                    unit: {
+                        type: String,
+                        default: "g"
                     },
-                    rda_percent: {
+                    per_100g: {
                         type: Number,
-                        default: null
+                        default: 0
+                    },
+                    per_serving: {
+                        type: Number,
+                        default: 0
                     }
                 },
 
@@ -324,10 +243,6 @@ const ComboProductSchema = new mongoose.Schema(
                     per_serving: {
                         type: Number,
                         default: 0
-                    },
-                    rda_percent: {
-                        type: Number,
-                        default: null
                     }
                 }
             }

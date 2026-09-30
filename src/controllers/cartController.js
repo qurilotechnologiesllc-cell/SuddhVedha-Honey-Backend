@@ -1408,6 +1408,20 @@ const getCart = asyncHandler(async (req, res) => {
                     product_type:
                         "combo",
 
+                    comboSets:
+                        (comboProduct.products || []).map(
+                            product => ({
+                                name:
+                                    product.name,
+
+                                weight:
+                                    product.weight,
+
+                                unit:
+                                    product.unit
+                            })
+                        ),
+
                     image: primaryImage
                         ? {
                             image_url:
