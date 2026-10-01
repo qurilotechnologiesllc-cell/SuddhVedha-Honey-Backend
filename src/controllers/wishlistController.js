@@ -96,7 +96,7 @@ const getWishlist = asyncHandler(async (req, res) => {
             ]
         })
 
-   if (!wishlist) {
+    if (!wishlist) {
         return res.status(200).json({
             success: true,
             message: 'Wishlist is empty',
@@ -137,10 +137,28 @@ const wishlistCount = asyncHandler(async (req, res) => {
     })
 })
 
+const clearAllwishListProducts = asyncHandler(async (req, res) => {
+    const { id } = req.user;
+
+    const result = await Wishlist.deleteOne({ userId: id });
+
+    if (result.deletedCount === 0) {
+        return res.status(404).json({
+            success: false,
+            message: 'Wishlist not found or already empty',
+        });
+    }
+
+    return res.status(200).json({
+        success: true,
+        message: 'All wishlist products removed successfully',
+    });
+});
 
 module.exports = {
     addProductToWishlist,
     removeProductFromWishlist,
     getWishlist,
-    wishlistCount
+    wishlistCount,
+    clearAllwishListProducts
 }
