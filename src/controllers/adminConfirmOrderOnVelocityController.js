@@ -11,12 +11,6 @@ const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFou
 const checkdeliveryavailability = asyncHandler(async (req, res) => {
   const { pincode } = req.body;
 
-  const role = req.user.role;
-
-  if (role !== "user") {
-    throw new ForbiddenError("Access denied. Only users can check delivery availability.");
-  }
-
   if (!pincode) {
     throw new BadRequestError("Pincode is required");
   }
