@@ -1024,5 +1024,165 @@ const getmyPlanPurchases = asyncHandler(async (req, res) => {
     });
 });
 
+const retryplanPurchasePayment = asyncHandler(async (req, res) => {
+    try {
+        const { purchase_id } = req.body;
 
-module.exports = { checkoutPlan, razorpayWebhooks, getmyPlanPurchases }
+        // ----------------------------------------
+        // 1. Validate purchase ID
+        // ----------------------------------------
+        if (!purchase_id) {
+            return res.status(400).json({
+                success: false,
+                message: "Purchase ID is required"
+            });
+        }
+
+        // ----------------------------------------
+        // 2. Get user ID from authentication token
+        // ----------------------------------------
+        const userId = req.user.id;
+
+        // ----------------------------------------
+        // 3. Find purchase plan
+        // ----------------------------------------
+        const purchasePlan = await PurchaseplanDetails.findOne({
+            _id: purchase_id,
+            userId
+        });
+
+        if (!purchasePlan) {
+            return res.status(404).json({
+                success: false,
+                message: "Purchase plan not found"
+            });
+        }
+
+        // ----------------------------------------
+        // 4. Payment must be failed
+        // ----------------------------------------
+        if (purchasePlan.payment_status !== "failed") {
+            return res.status(400).json({
+                success: false,
+                message: `Payment retry is not allowed. Current payment status is ${purchasePlan.payment_status}`
+            });
+        }
+
+        // ----------------------------------------
+        // 5. Purchase must be pending payment
+        // ----------------------------------------
+        if (purchasePlan.status !== "pending_payment") {
+            return res.status(400).json({
+                success: false,
+                message: `Payment retry is not allowed for purchase with status ${purchasePlan.status}`
+            });
+        }
+
+        // ----------------------------------------
+        // 6. Get Razorpay Order ID
+        // ----------------------------------------
+        const razorpayOrderId =
+            purchasePlan.payment?.razorpay_order_id;
+
+        if (!razorpayOrderId) {
+            return res.status(400).json({
+                success: false,
+                message: "Razorpay order ID not found"
+            });
+        }
+
+        // ----------------------------------------
+        // 7. Fetch Razorpay Order
+        // ----------------------------------------
+        const razorpayOrder =
+            await razorpay.orders.fetch(razorpayOrderId);
+
+        if (!razorpayOrder) {
+            return res.status(400).json({
+                success: false,
+                message: "Unable to fetch Razorpay order"
+            });
+        }
+
+        // ----------------------------------------
+        // 8. Verify payment amount
+        // ----------------------------------------
+        const expectedAmount =
+            Math.round(Number(purchasePlan.finalAmount) * 100);
+
+        if (Number(razorpayOrder.amount) !== expectedAmount) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment amount mismatch"
+            });
+        }
+
+        // ----------------------------------------
+        // 9. Check Razorpay order status
+        // ----------------------------------------
+        if (razorpayOrder.status === "paid") {
+            return res.status(400).json({
+                success: false,
+                message: "This payment has already been completed"
+            });
+        }
+
+        if (
+            razorpayOrder.status !== "created" &&
+            razorpayOrder.status !== "attempted"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    `Payment cannot be retried. Razorpay order status is ${razorpayOrder.status}`
+            });
+        }
+
+        // ----------------------------------------
+        // 10. Return Razorpay order details
+        // ----------------------------------------
+        return res.status(200).json({
+            success: true,
+            message: "Payment retry is available",
+            data: {
+                purchase_id: purchasePlan.purchase_id,
+                plan_purchase_id: purchasePlan._id,
+                planId: purchasePlan.planId,
+
+                razorpay_order_id: razorpayOrder.id,
+
+                amount: razorpayOrder.amount,
+                currency: razorpayOrder.currency,
+
+                key_id: process.env.RAZORPAY_KEY_ID,
+
+                customer: {
+                    name: purchasePlan.customer?.name || "",
+                    email: purchasePlan.customer?.email || "",
+                    mobile: purchasePlan.customer?.mobile || ""
+                },
+
+                plan: {
+                    name: purchasePlan.plan?.name || "",
+                    image: purchasePlan.plan?.image || ""
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error(
+            "Retry Plan Purchase Payment Error:",
+            error?.error || error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to retry plan purchase payment",
+            error:
+                error?.error?.description ||
+                error.message
+        });
+    }
+});
+
+module.exports = { checkoutPlan, razorpayWebhooks, getmyPlanPurchases, retryplanPurchasePayment }
