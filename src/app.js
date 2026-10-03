@@ -26,6 +26,7 @@ const InfluencerDetails = require('./routes/InfluencerDetailsRoute.js');
 const UserOrderRoutes = require('./routes/userOrderRoute.js');
 const PurchasePlanRoutes = require('./routes/purchasePlanRoute.js');
 const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js');
+const UserSubscribeRoute = require('./routes/userSubscribeRoute.js')
 
 // Combo Product Routes
 const ComboProductsRoutes = require('./routes/comboProductsRoute.js')
@@ -67,6 +68,8 @@ app.use(cors({
     "https://sltwdpp8-3000.inc1.devtunnels.ms",
 
     "https://frontend-3050.devtunnels.ms",
+
+    "https://l3zz8htl-5500.inc1.devtunnels.ms",
 
     "https://suddhveda-z57g.vercel.app",
 
@@ -120,6 +123,7 @@ app.use('/api/bulkorder/enquiry', bulkOrderEnquiry);
 app.use('/api/influencer', InfluencerDetails);
 app.use('/api/order', UserOrderRoutes);
 app.use('/api/purchase-plans', PurchasePlanRoutes);
+app.use('/api/subscribe', UserSubscribeRoute);
 
 // combo product
 app.use('/api/combo/products', ComboProductsRoutes);
