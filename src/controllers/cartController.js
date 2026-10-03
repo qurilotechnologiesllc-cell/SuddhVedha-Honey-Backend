@@ -10,10 +10,10 @@ const redis = require('../utils/redis')
 const formatWeight = require("../helpers/formatweight");
 const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ValidationError } = require('../errors/errorConfig')
 
-const { buildCartCatalog } = require('../services/cartCatalog.service')
+// const { buildCartCatalog } = require('../services/cartCatalog.service')
 
-const buildNormalCart = require('../helpers/buildNormalCart.helper')
-const buildGiftCart = require('../helpers/buildGiftCart.helper')
+// const buildNormalCart = require('../helpers/buildNormalCart.helper')
+// const buildGiftCart = require('../helpers/buildGiftCart.helper')
 
 const addToCart = asyncHandler(async (req, res) => {
 
@@ -23,6 +23,7 @@ const addToCart = asyncHandler(async (req, res) => {
         productId,
         selectedWeight,
         comboProductId,
+        message,
         quantity
     } = req.body;
 
@@ -111,6 +112,7 @@ const addToCart = asyncHandler(async (req, res) => {
 
             // Same combo → only quantity update
             existingItem.quantity += quantity;
+            existingItem.message = message
 
         } else {
 
@@ -118,6 +120,7 @@ const addToCart = asyncHandler(async (req, res) => {
             cart.items.push({
                 type: "COMBO",
                 comboProductId: comboProduct._id,
+                message: message,
                 quantity
             });
 
@@ -1325,6 +1328,8 @@ const getCart = asyncHandler(async (req, res) => {
             const quantity =
                 Number(item.quantity || 1);
 
+            const message = item.message || ""
+
 
             // -----------------------------------------
             // Single combo weight
@@ -1390,6 +1395,8 @@ const getCart = asyncHandler(async (req, res) => {
                 cartItemId: item._id,
 
                 quantity,
+
+                message,
 
                 product: {
 

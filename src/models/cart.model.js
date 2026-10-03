@@ -32,6 +32,11 @@ const cartItemSchema = new Schema(
             ref: "ComboProduct"
         },
 
+        message: {
+            type: String,
+            trim: true,
+            default: ""
+        },
 
         // =========================
         // COMMON
