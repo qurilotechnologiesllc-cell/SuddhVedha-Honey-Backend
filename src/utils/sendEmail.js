@@ -270,4 +270,25 @@ const sendnotificationEmailToUser = async (userInfo, orderdetails) => {
     }
 }
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser };
+const sendWelcomeEmail = async (userEmail) => {
+    try {
+        const response = await brevo.transactionalEmails.sendTransacEmail({
+            sender: {
+                email: process.env.BREVO_SENDER_EMAIL,
+                name: process.env.BREVO_SENDER_NAME,
+            },
+            to: [{ email: userEmail }],
+            templateId: Number(process.env.BREVO_WELCOME_TEMPLATE_ID),
+        });
+
+        console.log('✅ Welcome email sent:', response?.messageId || response);
+
+        return { success: true, data: response };
+    } catch (error) {
+        console.error('❌ Welcome email failed:', error?.message || error);
+
+        return { success: false, error: error?.message || 'Failed to send email' };
+    }
+}
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail };

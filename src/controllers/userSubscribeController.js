@@ -1,5 +1,6 @@
 const SubscribeSchema = require('../models/subscribe.model')
 const { asyncHandler, BadRequestError, ConflictError } = require('../errors/errorConfig')
+const { sendWelcomeEmail } = require('../utils/sendEmail')
 
 const EMAIL_REGEX =
     /^(?!.*\.\.)[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
@@ -61,6 +62,8 @@ const SubmitDetails = asyncHandler(async (req, res) => {
         }
         throw err
     }
+
+    const result = await sendWelcomeEmail(email)
 
     return res.status(201).json({
         success: true,
