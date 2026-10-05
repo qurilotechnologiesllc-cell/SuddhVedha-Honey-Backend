@@ -71,9 +71,11 @@ const SubmitDetails = asyncHandler(async (req, res) => {
     })
 })
 
-const getAllSubscribeUser = asyncHandler(async (req, res) => {
+// Missing, null ya empty string, teeno ko "value nahi hai" maana jayega
+const EMPTY = [null, '']
 
-    const {role} = req.user
+const fetchSubscribers = async (req, res, { baseFilter, select, searchFields, message }) => {
+    const { role } = req.user
 
     if (role !== 'admin') {
         return res.status(403).json({
@@ -81,26 +83,28 @@ const getAllSubscribeUser = asyncHandler(async (req, res) => {
             message: 'Access denied. Admins only.',
         })
     }
+
     // Query params: ?page=1&limit=10&search=pritam&sort=desc
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100)
     const skip = (page - 1) * limit
     const sortOrder = req.query.sort === 'asc' ? 1 : -1
 
-    // Optional search (email / name / mobile)
-    const filter = {}
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
+    const conditions = [baseFilter]
 
     if (search) {
-        // Special regex characters escape karo (regex injection se bachne ke liye)
         const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         const regex = new RegExp(escaped, 'i')
-        filter.$or = [{ email: regex }, { name: regex }, { mobile: regex }]
+        conditions.push({ $or: searchFields.map((field) => ({ [field]: regex })) })
     }
+
+    // baseFilter aur search dono saath lagane ke liye $and
+    const filter = { $and: conditions }
 
     const [subscribers, totalCount] = await Promise.all([
         SubscribeSchema.find(filter)
-            .select('name email mobile createdAt')
+            .select(select)
             .sort({ createdAt: sortOrder })
             .skip(skip)
             .limit(limit)
@@ -110,7 +114,7 @@ const getAllSubscribeUser = asyncHandler(async (req, res) => {
 
     return res.status(200).json({
         success: true,
-        message: 'Subscribers fetched successfully',
+        message,
         data: subscribers,
         pagination: {
             totalCount,
@@ -121,7 +125,36 @@ const getAllSubscribeUser = asyncHandler(async (req, res) => {
             hasPrevPage: page > 1,
         },
     })
+}
+
+
+// 1) Sirf email se subscribe karne wale users
+const getEmailOnlySubscribers = asyncHandler(async (req, res) => {
+    return fetchSubscribers(req, res, {
+        baseFilter: {
+            name: { $in: EMPTY },
+            mobile: { $in: EMPTY },
+        },
+        select: 'email createdAt',
+        searchFields: ['email'],
+        message: 'Email-only subscribers fetched successfully',
+    })
+})
+
+// 2) Jinhone name / mobile bhi diya hai (email, name, mobile ke saath)
+const getDetailedSubscribers = asyncHandler(async (req, res) => {
+    return fetchSubscribers(req, res, {
+        baseFilter: {
+            $or: [
+                { name: { $nin: EMPTY } },
+                { mobile: { $nin: EMPTY } },
+            ],
+        },
+        select: 'name email mobile createdAt',
+        searchFields: ['email', 'name', 'mobile'],
+        message: 'Detailed subscribers fetched successfully',
+    })
 })
 
 
-module.exports = { SubmitDetails, getAllSubscribeUser }
+module.exports = { SubmitDetails, getEmailOnlySubscribers, getDetailedSubscribers }
