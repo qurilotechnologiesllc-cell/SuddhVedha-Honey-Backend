@@ -72,6 +72,15 @@ const SubmitDetails = asyncHandler(async (req, res) => {
 })
 
 const getAllSubscribeUser = asyncHandler(async (req, res) => {
+
+    const {role} = req.user
+
+    if (role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. Admins only.',
+        })
+    }
     // Query params: ?page=1&limit=10&search=pritam&sort=desc
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100)
