@@ -197,6 +197,8 @@ const checkoutPlan = asyncHandler(async (req, res) => {
         country: String(shipping_address.country || "India").trim()
     }
 
+    const PINCODE_REGEX = /^[1-9]\d{5}$/
+
     if (!cleanAddress.address_line1 || !cleanAddress.city || !cleanAddress.state) {
         throw new BadRequestError("Shipping address line 1, city and state are required")
     }
