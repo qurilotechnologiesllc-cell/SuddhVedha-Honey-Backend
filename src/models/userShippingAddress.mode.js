@@ -1,5 +1,4 @@
 const { Schema, model } = require('mongoose')
-
 const mongoose = require('mongoose')
 
 const UserShippingAddressesSchema = new Schema({
@@ -71,9 +70,24 @@ const UserShippingAddressesSchema = new Schema({
     is_default: {
         type: Boolean,
         default: false
-    }
+    },
+
+    address_hash: {
+        type: String,
+        trim: true,
+    },
 },
     { timestamps: true }
+)
+
+// schema ke neeche index
+UserShippingAddressesSchema.index(
+    { user_id: 1, address_hash: 1 },
+    {
+        unique: true,
+        // sirf unhi documents par jinme hash hai (purane docs ko rok nahi lagegi)
+        partialFilterExpression: { address_hash: { $type: "string" } },
+    }
 )
 
 module.exports = model('UserShippingAddresses', UserShippingAddressesSchema)

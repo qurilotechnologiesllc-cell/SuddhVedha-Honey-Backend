@@ -1,5 +1,6 @@
 const ShippingAddress = require('../models/userShippingAddress.mode')
 const User = require('../models/user.model')
+const { generateAddressHash } = require('../helpers/addressHelper')
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
 const addShippingAddress = asyncHandler(async (req, res) => {
@@ -25,29 +26,51 @@ const addShippingAddress = asyncHandler(async (req, res) => {
         )
     }
 
+    const cleanAddress = {
+        address_line1: String(address_line1 || "").trim(),
+        address_line2: String(address_line2 || "").trim(),
+        city: String(city || "").trim(),
+        state: String(state || "").trim(),
+        pincode: String(pincode || "").trim(),
+        country: String(country || "India").trim()
+    }
+
+    // ─── Duplicate Address Check (user_id + address_hash) ───
+    const addressHash = generateAddressHash(cleanAddress)
+
+    const addressExists = await ShippingAddress.exists({
+        user_id: id,
+        address_hash: addressHash
+    })
+
+    if (addressExists) {
+        throw new ConflictError('This address is already saved')
+    }
+
     // 2. Set is_default: false for all OTHER addresses belonging to this user
     await ShippingAddress.updateMany(
-        {
-            user_id: id
-        },
+        { user_id: id },
         { $set: { is_default: false } }
     );
 
-    const newShippingAddress = await ShippingAddress.create({
-        user_id: id,
-        full_name,
-        phone_number,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        pincode,
-        country,
-        address_type,
-        is_default: true
-    })
-
-    await newShippingAddress.save()
+    let newShippingAddress
+    try {
+        newShippingAddress = await ShippingAddress.create({
+            user_id: id,
+            full_name,
+            phone_number,
+            ...cleanAddress,
+            address_type,
+            address_hash: addressHash,
+            is_default: true
+        })
+    } catch (error) {
+        // Race condition: do requests ek saath aayi to unique index ne dusri ko roka
+        if (error.code === 11000) {
+            throw new ConflictError('This address is already saved')
+        }
+        throw error
+    }
 
     res.status(201).json({
         success: true,
@@ -93,6 +116,18 @@ const editShippingAddress = asyncHandler(async (req, res) => {
         throw new BadRequestError('All required fields must be provided');
     }
 
+    const cleanAddress = {
+        address_line1: String(address_line1 || "").trim(),
+        address_line2: String(address_line2 || "").trim(),
+        city: String(city || "").trim(),
+        state: String(state || "").trim(),
+        pincode: String(pincode || "").trim(),
+        country: String(country || "India").trim()
+    }
+
+    // ─── Duplicate Address Check (user_id + address_hash) ───
+    const addressHash = generateAddressHash(cleanAddress)
+
     // 1. Find and update the targeted shipping address
     const shippingAddress = await ShippingAddress.findOneAndUpdate(
         { _id: shippingAddressId, user_id: id },
@@ -106,6 +141,7 @@ const editShippingAddress = asyncHandler(async (req, res) => {
             pincode,
             country,
             address_type,
+            address_hash: addressHash,
             is_default: true
         },
         { new: true }

@@ -4,6 +4,7 @@ const User = require("../models/user.model")
 const Plan = require('../models/plans.models')
 const PurchaseplanDetails = require('../models/purchaseplan.model')
 const ShippingAddress = require('../models/userShippingAddress.mode')
+const { generateAddressHash } = require('../helpers/addressHelper')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
 const razorpay = require('../utils/razorpay')
 
@@ -187,7 +188,49 @@ const checkoutPlan = asyncHandler(async (req, res) => {
 
     }
 
+    const cleanAddress = {
+        address_line1: String(shipping_address.address_line1 || "").trim(),
+        address_line2: String(shipping_address.address_line2 || "").trim(),
+        city: String(shipping_address.city || "").trim(),
+        state: String(shipping_address.state || "").trim(),
+        pincode: String(shipping_address.pincode || "").trim(),
+        country: String(shipping_address.country || "India").trim()
+    }
 
+    if (!cleanAddress.address_line1 || !cleanAddress.city || !cleanAddress.state) {
+        throw new BadRequestError("Shipping address line 1, city and state are required")
+    }
+
+    if (!PINCODE_REGEX.test(cleanAddress.pincode)) {
+        throw new BadRequestError("Valid 6-digit shipping pincode is required")
+    }
+
+    let newAddressSaved = false
+
+    try {
+        const addressHash = generateAddressHash(cleanAddress)
+
+        const result = await ShippingAddress.updateOne(
+            { user_id: user._id, address_hash: addressHash },
+            {
+                $setOnInsert: {
+                    user_id: user._id,
+                    address_hash: addressHash,
+                    ...cleanAddress,
+                    address_type: shipping_address.address_type || "home",
+                },
+            },
+            { upsert: true }
+        )
+
+        // upsertedCount 1 = naya address insert hua, 0 = pehle se tha
+        newAddressSaved = result.upsertedCount > 0
+    } catch (error) {
+        // 11000 = race condition me same address dobara insert hua, ye normal hai
+        if (error.code !== 11000) {
+            console.error("Shipping address save failed:", error.message)
+        }
+    }
     // ─────────────────────────────────────
     // 9. Generate Purchase ID
     // ─────────────────────────────────────
