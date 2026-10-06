@@ -526,31 +526,253 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
 
 const cancelOrderByAdmin = asyncHandler(async (req, res) => {
   const { role } = req.user;
+  const { orderGroupIds } = req.body;
 
-  const { orderGroupId } = req.body;
-
+  // --------------------------------------------------
+  // 1. Admin only
+  // --------------------------------------------------
   if (role !== "admin") {
     return res.status(403).json({
       success: false,
-      message: "Only admin can cancel Velocity order",
+      message: "Only admin can cancel Velocity orders",
     });
   }
 
-  if (!orderGroupId) {
+  // --------------------------------------------------
+  // 2. Validate orderGroupIds
+  // --------------------------------------------------
+  if (
+    !Array.isArray(orderGroupIds) ||
+    orderGroupIds.length === 0
+  ) {
     return res.status(400).json({
       success: false,
-      message: "orderGroupId is required",
+      message: "orderGroupIds must be a non-empty array",
     });
   }
 
-  if (!mongoose.Types.ObjectId.isValid(orderGroupId)) {
+  // --------------------------------------------------
+  // 3. Validate ObjectIds
+  // --------------------------------------------------
+  const invalidIds = orderGroupIds.filter(
+    (id) => !mongoose.Types.ObjectId.isValid(id)
+  );
+
+  if (invalidIds.length > 0) {
     return res.status(400).json({
       success: false,
-      message: "Invalid orderGroupId",
+      message: "One or more invalid orderGroupIds",
+      invalidIds,
     });
   }
 
-  const velocityOrder = await VelocitySchema.findOne({ orderGroupId });
+  // Remove duplicate group IDs
+  const uniqueOrderGroupIds = [
+    ...new Set(orderGroupIds.map((id) => id.toString())),
+  ];
+
+  // --------------------------------------------------
+  // 4. Find Velocity orders
+  // --------------------------------------------------
+  const velocityOrders = await VelocitySchema.find({
+    orderGroupId: {
+      $in: uniqueOrderGroupIds,
+    },
+  });
+
+  if (!velocityOrders.length) {
+    return res.status(404).json({
+      success: false,
+      message: "No Velocity orders found for provided orderGroupIds",
+    });
+  }
+
+  // --------------------------------------------------
+  // 5. Validate all requested groups were found
+  // --------------------------------------------------
+  const foundGroupIds = new Set(
+    velocityOrders.map((item) =>
+      item.orderGroupId.toString()
+    )
+  );
+
+
+  const notFoundGroupIds = uniqueOrderGroupIds.filter(
+    (id) => !foundGroupIds.has(id)
+  );
+
+  // --------------------------------------------------
+  // 6. Check shipment status before cancellation
+  // --------------------------------------------------
+  const invalidForCancellation = [];
+  const cancellableOrders = [];
+
+  for (const velocityOrder of velocityOrders) {
+    const trackingData = velocityOrder?.tracking?.current?.data;
+
+    const status = trackingData?.status;
+    const subStatus = trackingData?.sub_status;
+
+    /**
+     * Cancel only before courier pickup.
+     *
+     * Velocity tracking:
+     * status: cancelled
+     * sub_status: ready_for_pickup
+     *
+     * We primarily check ready_for_pickup because this
+     * represents the shipment waiting for pickup.
+     */
+    if (subStatus !== "ready_for_pickup") {
+      invalidForCancellation.push({
+        orderGroupId: velocityOrder.orderGroupId,
+        awbCode: velocityOrder.awbCode,
+        status,
+        subStatus,
+        message: "Order cannot be cancelled because shipment is not ready for pickup",
+      });
+
+      continue;
+    }
+
+    if (!velocityOrder.awbCode) {
+      invalidForCancellation.push({
+        orderGroupId: velocityOrder.orderGroupId,
+        message: "AWB code not found",
+      });
+
+      continue;
+    }
+
+    cancellableOrders.push(velocityOrder);
+  }
+
+  // --------------------------------------------------
+  // 7. Nothing is cancellable
+  // --------------------------------------------------
+  if (!cancellableOrders.length) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "No eligible Velocity orders found for cancellation",
+      notFoundGroupIds,
+      invalidForCancellation,
+    });
+  }
+
+  // --------------------------------------------------
+  // 8. Prepare AWBs
+  // --------------------------------------------------
+  const awbs = [
+    ...new Set(
+      cancellableOrders
+        .map((order) => order.awbCode)
+        .filter(Boolean)
+    ),
+  ];
+
+  console.log(awbs);
+
+  // --------------------------------------------------
+  // 9. Call Velocity Cancel API
+  // --------------------------------------------------
+  let velocityResponse;
+
+  try {
+    velocityResponse = await axios.post(
+      `${process.env.VELOCITY_BASE_URL}/custom/api/v1/cancel-order`,
+      {
+        awbs,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.VELOCITY_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Velocity cancel order error:",
+      error?.response?.data || error.message
+    );
+
+    return res.status(
+      error?.response?.status >= 400 &&
+        error?.response?.status < 500
+        ? error.response.status
+        : 502
+    ).json({
+      success: false,
+      message: "Failed to cancel orders on Velocity",
+      error:
+        error?.response?.data ||
+        error.message,
+      awbs,
+    });
+  }
+
+  // --------------------------------------------------
+  // 10. Collect all Order IDs from Velocity documents
+  // --------------------------------------------------
+  const orderIds = [
+    ...new Set(
+      cancellableOrders.flatMap(
+        (velocityOrder) =>
+          (velocityOrder.orderIds || []).map((id) =>
+            id.toString()
+          )
+      )
+    ),
+  ];
+
+  // --------------------------------------------------
+  // 11. Update Order collection
+  // --------------------------------------------------
+  let updatedOrders = 0;
+
+  if (orderIds.length > 0) {
+    const updateResult = await Order.updateMany(
+      {
+        _id: {
+          $in: orderIds,
+        },
+      },
+      {
+        $set: {
+          order_status: "cancelled",
+        },
+      }
+    );
+
+    updatedOrders = updateResult.modifiedCount;
+  }
+
+  // --------------------------------------------------
+  // 12. Return response
+  // --------------------------------------------------
+  return res.status(200).json({
+    success: true,
+    message: "Velocity orders cancelled successfully",
+
+    cancelled: {
+      orderGroupIds: cancellableOrders.map(
+        (order) => order.orderGroupId
+      ),
+
+      awbs,
+
+      orderIds,
+
+      updatedOrders,
+    },
+
+    notFoundGroupIds,
+
+    skipped: invalidForCancellation,
+
+    velocityResponse: velocityResponse.data,
+  });
 });
 
 const orderTrackingByVelocityWebhooks = asyncHandler(
@@ -919,9 +1141,11 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
   }
 );
 
+
 module.exports = {
   checkdeliveryavailability,
   checkDeliveryAvailabilitybyAdmin,
   creareOrderByAdmin,
-  orderTrackingByVelocityWebhooks
+  orderTrackingByVelocityWebhooks,
+  cancelOrderByAdmin
 };

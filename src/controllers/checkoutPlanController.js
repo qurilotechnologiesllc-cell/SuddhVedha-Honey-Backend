@@ -1,9 +1,9 @@
-
 const crypto = require("crypto");
 const mongoose = require('mongoose')
 const User = require("../models/user.model")
 const Plan = require('../models/plans.models')
 const PurchaseplanDetails = require('../models/purchaseplan.model')
+const ShippingAddress = require('../models/userShippingAddress.mode')
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, } = require('../errors/errorConfig')
 const razorpay = require('../utils/razorpay')
 
@@ -1185,4 +1185,40 @@ const retryplanPurchasePayment = asyncHandler(async (req, res) => {
     }
 });
 
-module.exports = { checkoutPlan, razorpayWebhooks, getmyPlanPurchases, retryplanPurchasePayment }
+const getUserAddress = asyncHandler(async (req, res) => {
+    const { id, role } = req.user
+
+    if (!id) {
+        throw new UnauthorizedError(
+            "User authentication required"
+        );
+    }
+
+    if (role !== "user") {
+        throw new ForbiddenError(
+            "Access denied. Only users can access this endpoint"
+        );
+    }
+
+    const addresses = await ShippingAddress.find({ user_id: id })
+        .sort({ createdAt: -1 })
+        .lean()
+
+    if (!addresses.length) {
+        return res.status(200).json({
+            success: true,
+            message: 'No shipping address available',
+            data: [],
+        })
+    }
+
+    return res.status(200).json({
+        success: true,
+        message: 'Shipping addresses fetched successfully',
+        count: addresses.length,
+        data: addresses,
+    })
+});
+
+
+module.exports = { checkoutPlan, razorpayWebhooks, getmyPlanPurchases, retryplanPurchasePayment, getUserAddress }
