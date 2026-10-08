@@ -42,13 +42,54 @@ const SubmitDetails = asyncHandler(async (req, res) => {
         }
     }
 
-    // 4. Duplicate check
-    const alreadySubscribed = await SubscribeSchema.exists({ email: normalizedEmail })
-    if (alreadySubscribed) {
-        throw new ConflictError('This email is already subscribed')
+    // 4. Email pehle se registered hai?
+    const existing = await SubscribeSchema.findOne({ email: normalizedEmail })
+        .select('name mobile')
+        .lean()
+
+    if (existing) {
+        // Sirf wahi fields update hongi jo DB me khaali hain aur body me aayi hain
+        const fieldsToUpdate = {}
+        const emptyFilter = {}
+
+        if (cleanName && !existing.name) {
+            fieldsToUpdate.name = cleanName
+            emptyFilter.name = { $in: [null, ''] }
+        }
+
+        if (cleanMobile && !existing.mobile) {
+            fieldsToUpdate.mobile = cleanMobile
+            emptyFilter.mobile = { $in: [null, ''] }
+        }
+
+        // Fill karne ke liye kuch nahi hai, to already subscribed
+        if (Object.keys(fieldsToUpdate).length === 0) {
+            throw new ConflictError('You have already subscribed')
+        }
+
+        // Filter me "field abhi bhi khaali hai" bhi hai, taaki race condition me
+        // kisi aur request ki likhi hui value overwrite na ho
+        const updateResult = await SubscribeSchema.updateOne(
+            { _id: existing._id, ...emptyFilter },
+            { $set: fieldsToUpdate }
+        )
+
+        if (updateResult.modifiedCount === 0) {
+            throw new ConflictError('You have already subscribed')
+        }
+
+        const updatedLabels = []
+        if (fieldsToUpdate.name) updatedLabels.push('name')
+        if (fieldsToUpdate.mobile) updatedLabels.push('mobile number')
+
+        return res.status(200).json({
+            success: true,
+            message: `Your email is already registered, and we've updated your ${updatedLabels.join(' and ')} with the details you provided.`,
+            updated_fields: Object.keys(fieldsToUpdate),
+        })
     }
 
-    // 5. Save (optional fields tabhi jayenge jab diye gaye ho)
+    // 5. Naya subscriber: save
     try {
         await SubscribeSchema.create({
             email: normalizedEmail,
@@ -58,18 +99,19 @@ const SubmitDetails = asyncHandler(async (req, res) => {
     } catch (err) {
         // Race condition: do requests ek saath aayi to unique index error dega
         if (err.code === 11000) {
-            throw new ConflictError('This email is already subscribed')
+            throw new ConflictError('You have already subscribed')
         }
         throw err
     }
 
-    const result = await sendWelcomeEmail(email)
+    // Welcome email sirf naye subscriber ko, response ko block kiye bina
+    sendWelcomeEmail(normalizedEmail).catch(() => { })
 
     return res.status(201).json({
         success: true,
         message: 'Subscribed successfully',
     })
-})
+});
 
 // Missing, null ya empty string, teeno ko "value nahi hai" maana jayega
 const EMPTY = [null, '']
