@@ -13,7 +13,7 @@ const { asyncHandler, ConflictError, BadRequestError, UnauthorizedError, Forbidd
 // const { buildCartCatalog } = require('../services/cartCatalog.service')
 
 // const buildNormalCart = require('../helpers/buildNormalCart.helper')
-// const buildGiftCart = require('../helpers/buildGiftCart.helper')
+// const buildComboCart = require('../helpers/buildComboCart.helper')
 
 const addToCart = asyncHandler(async (req, res) => {
 
@@ -813,7 +813,7 @@ const addToCart = asyncHandler(async (req, res) => {
 //     // Combo Cart
 //     // =====================================================
 
-//     const comboItems = buildGiftCart(
+//     const comboItems = buildComboCart(
 //         comboCart,
 //         catalogMap,
 //         comboPackMap
@@ -840,63 +840,6 @@ const addToCart = asyncHandler(async (req, res) => {
 
 // });
 
-// const getCart = asyncHandler(async (req, res) => {
-
-//     const userId = req.user.id;
-
-
-//     // =====================================================
-//     // Build Cart Catalog
-//     // =====================================================
-
-//     const {
-//         cart,
-//         comboCart,
-//         catalogMap,
-//         comboPackMap
-//     } = await buildCartCatalog(userId);
-
-
-//     // =====================================================
-//     // Normal Cart
-//     // =====================================================
-
-//     const normalItems = buildNormalCart(
-//         cart,
-//         catalogMap
-//     );
-
-
-//     // =====================================================
-//     // Combo Cart
-//     // =====================================================
-
-//     const comboItems = buildGiftCart(
-//         comboCart,
-//         catalogMap,
-//         comboPackMap
-//     );
-
-
-//     // =====================================================
-//     // Response
-//     // =====================================================
-
-//     return res.status(200).json({
-
-//         success: true,
-
-//         items: [
-
-//             ...normalItems,
-
-//             ...comboItems
-
-//         ]
-
-//     });
-
-// });
 
 
 const getCart = asyncHandler(async (req, res) => {

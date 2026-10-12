@@ -15,6 +15,7 @@ router.delete('/remove/combo-product/:comboProductId/image/:imageId', deleteImag
 
 router.put('/update/comboProduct-image/:comboProductId', uploadSingle, updateComboProductImages);
 
+// this two routes are not used now because this is a features to add the comboset Of comboProducts and this is not use
 router.post('/add/set-pack/:comboProductId', uploadSingle, createSetPackOfcomboProduct);
 
 router.delete('/remove/setpack/:comboProductId/:setPackId', authMiddleware, removeSetPackfromComboProduct)
