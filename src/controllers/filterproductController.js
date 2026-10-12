@@ -4,53 +4,43 @@ const Product = require('../models/product.model');
 
 const { asyncHandler, BadRequestError, NotFoundError, } = require('../errors/errorConfig')
 
-const filterProductByCategory = asyncHandler(async (req, res) => {
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const { slug } = req.params;
+const filterProductByFloralSource = asyncHandler(async (req, res) => {
+    const { floral_source } = req.query;
 
-    const category = await Category.findOne({
-        slug,
-        is_active: true
-    }).lean();
+    const query = { is_active: true };
 
-    if (!category) {
-        throw new NotFoundError("Category not found.");
+    if (typeof floral_source === "string" && floral_source.trim()) {
+        query.floral_source = {
+            $regex: escapeRegex(floral_source.trim()),
+            $options: "i"
+        };
     }
 
-    const products = await Product.find({
-        categoryId: category._id,
-        is_active: true
-    })
-        .populate({
-            path: "categoryId",
-            select: "category_name slug"
-        })
-        .populate({
-            path: "variantDocumentId",
-            select: "variants -_id"
-        })
-        .populate({
-            path: "imageDocumentId",
-            select: "images -_id"
-        })
-        .populate({
-            path: "videoDocumentId",
-            select: "videos -_id"
-        })
+    const products = await Product.find(query)
+        .populate({ path: "variantDocumentId", select: "variants -_id" })
+        .populate({ path: "imageDocumentId", select: "images -_id" })
+        .populate({ path: "videoDocumentId", select: "videos -_id" })
         .lean();
 
     res.status(200).json({
-
         success: true,
-
         message: "Products fetched successfully.",
-
         totalProducts: products.length,
-
         data: products
-
     });
+});
 
+const getFloralSources = asyncHandler(async (req, res) => {
+    const floralSources = await Product.distinct("floral_source", { is_active: true });
+
+    res.status(200).json({
+        success: true,
+        message: "Floral sources fetched successfully.",
+        total: floralSources.length,
+        data: floralSources.filter(Boolean).sort()
+    });
 });
 
 const filterProductByQuantityPrice = asyncHandler(async (req, res) => {
@@ -386,4 +376,5 @@ const filterProductByProductName = asyncHandler(async (req, res) => {
     })
 });
 
-module.exports = { filterProductByCategory, filterProductByQuantityPrice, filterProductByRating, filterProductByQuantity, filterProductByProductName }
+
+module.exports = { filterProductByFloralSource, getFloralSources, filterProductByQuantityPrice, filterProductByRating, filterProductByQuantity, filterProductByProductName }
