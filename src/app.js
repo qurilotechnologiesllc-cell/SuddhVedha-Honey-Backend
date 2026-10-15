@@ -81,7 +81,9 @@ app.use(cors({
 
     "https://shuddhvedaadmin.vercel.app",
     
-    "https://www.shuddhvedahoney.com"
+    "https://www.shuddhvedahoney.com",
+
+    "https://admin.shuddhvedahoney.com"
   ],
 
   credentials: true
