@@ -29,7 +29,7 @@ const adminPlanOrdersRoute = require('./routes/adminPlanOrdersRoute.js');
 const UserSubscribeRoute = require('./routes/userSubscribeRoute.js')
 
 // Combo Product Routes
-const ComboProductsRoutes = require('./routes/comboProductsRoute.js')
+const ComboProductsRoutes = require('./routes/comboProductsRoute.js');
 
 // Now from there its start the admin routes 
 const adminAuthRoutes = require('./routes/adminAuthRoute');
