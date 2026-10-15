@@ -83,7 +83,11 @@ app.use(cors({
     
     "https://www.shuddhvedahoney.com",
 
-    "https://admin.shuddhvedahoney.com"
+    "https://admin.shuddhvedahoney.com",
+
+    "https://launch.shuddhvedahoney.com",
+
+    "http://launch.shuddhvedahoney.com"
   ],
 
   credentials: true
