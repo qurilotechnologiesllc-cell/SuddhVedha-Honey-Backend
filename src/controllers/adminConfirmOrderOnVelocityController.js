@@ -131,6 +131,13 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
     });
   }
 
+  if(orderGroup.payment_mode !=="cod" && orderGroup.payment_status !== "paid") {
+    return res.status(400).json({
+      success: false,
+      message: "If payment mode is not COD, then payment status must be paid to create order on Velocity",
+    }); 
+  }
+
   // ---------------------------------------------------
   // 5. Get all orders belonging to this group
   // ---------------------------------------------------
