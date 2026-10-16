@@ -2,6 +2,7 @@ const Order = require('../models/orders.model')
 const User = require('../models/user.model')
 const Ordergroup = require('../models/orderGoup.model')
 const Product = require('../models/product.model')
+const { getStartOfTodayIST, timeAgo } = require('../helpers/calculatePlacedTime')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
@@ -642,12 +643,46 @@ const getOrderWeeklyOverview = asyncHandler(async (req, res) => {
     });
 });
 
+const reacentOrders = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    if (role !== 'admin' && role !== 'superadmin') {
+        throw new ForbiddenError(
+            'You do not have permission to access this resource.'
+        );
+    }
+
+    const startOfToday = getStartOfTodayIST();
+
+    const orders = await Order.find({ createdAt: { $gte: startOfToday } })
+        .select('order_id order_status userId createdAt -_id')
+        .populate({ path: 'userId', select: 'name -_id' })
+        .sort({ createdAt: -1 })
+        .lean();
+
+    const data = orders.map((order) => ({
+        order_id: order.order_id,
+        name: order.userId?.name || 'Unknown',
+        order_status: order.order_status,
+        placed_at: order.createdAt,
+        placed_ago: timeAgo(order.createdAt)
+    }));
+
+    res.status(200).json({
+        success: true,
+        message: "Today's orders fetched successfully.",
+        totalOrders: data.length,
+        data
+    });
+});
+
 module.exports = {
     getAllOrders,
     getOrderfullDetails,
     getOrderWithStatus,
     getLowStockproductDetails,
-    getOrderWeeklyOverview
+    getOrderWeeklyOverview,
+    reacentOrders
 }
 
 
