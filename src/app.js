@@ -87,7 +87,9 @@ app.use(cors({
 
     "https://launch.shuddhvedahoney.com",
 
-    "http://launch.shuddhvedahoney.com"
+    "http://launch.shuddhvedahoney.com", 
+
+    "https://r7bmx3wg-3050.inc1.devtunnels.ms"
   ],
 
   credentials: true
