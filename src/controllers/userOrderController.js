@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Order = require('../models/orders.model');
 const Ordergroup = require('../models/orderGoup.model')
 const User = require('../models/user.model')
@@ -6,6 +7,7 @@ const CouponUsage = require('../models/couponUsage.model')
 const ProductVariant = require('../models/productVariant.model')
 const VelocitySchema = require('../models/velocityOrder.model')
 const Notification = require('../models/notification.model')
+const ReturnRequest = require('../models/ReturnRequest.model')
 const crypto = require('crypto')
 const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
@@ -15,6 +17,7 @@ const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler');
 const updateOrderGroupRefundSummary = require('../helpers/updateOrderGroupRefundSummary')
 const redis = require('../utils/redis')
+const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/uploadToCloudinary')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
@@ -2844,10 +2847,146 @@ const getliveTrackingDetails = asyncHandler(async (req, res) => {
     });
 });
 
+const createReturnRequest = asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const userId = req.user.id;
+
+    const { phoneNumber, reason } = req.body;
+
+    if (!phoneNumber || !reason) {
+        return res.status(400).json({
+            success: false,
+            message: "Phone number and reason are required.",
+        });
+    }
+
+    // 1. Validate orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid orderId.",
+        });
+    }
+
+    // 2. Get uploaded files
+    const packagingImages = req.files?.packagingImages || [];
+    const videoFiles = req.files?.unboxingVideo || [];
+
+    if (packagingImages.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "At least one packaging image is required.",
+        });
+    }
+
+    if (videoFiles.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Unboxing video is required.",
+        });
+    }
+
+    // 3. Find the order
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+        return res.status(404).json({
+            success: false,
+            message: "Order not found.",
+        });
+    }
+
+    // 4. Verify order ownership
+    if (order.userId.toString() !== userId.toString()) {
+        return res.status(403).json({
+            success: false,
+            message: "You are not authorized to request a return for this order.",
+        });
+    }
+
+    // 5. Get orderGroupId from the Order document
+    const orderGroupId = order.order_group_id;
+
+    if (!orderGroupId) {
+        return res.status(400).json({
+            success: false,
+            message: "Order group ID not found for this order.",
+        });
+    }
+
+    // 6. Allow return requests only for delivered orders
+    if (order.order_status?.toLowerCase() !== "delivered") {
+        return res.status(400).json({
+            success: false,
+            message: "Return requests can only be created for delivered orders.",
+        });
+    }
+
+    // 7. Prevent duplicate return requests for the same order
+    const existingRequest = await ReturnRequest.findOne({
+        userId,
+        orderId: order._id,
+    });
+
+    if (existingRequest) {
+        return res.status(409).json({
+            success: false,
+            message: "A return request already exists for this order.",
+            data: existingRequest,
+        });
+    }
+
+    // 8. Upload packaging images to Cloudinary
+    const uploadedImages = [];
+
+    for (const file of packagingImages) {
+        const result = await uploadToCloudinary(
+            file.buffer,
+            "Productproof/packaging"
+        );
+
+        uploadedImages.push({
+            url: result.secure_url,
+            public_id: result.public_id,
+        });
+    }
+
+    // 9. Upload unboxing video to Cloudinary
+    const videoResult = await uploadVideoToCloudinary(
+        videoFiles[0].buffer,
+        "Productproof/videos"
+    );
+
+    // Store only the video's public_id
+    const uploadedVideo = {
+        public_id: videoResult.public_id,
+    };
+
+    // 10. Create ReturnRequest document
+    const returnRequest = await ReturnRequest.create({
+        userId,
+        orderId: order._id,
+        orderGroupId,
+        packagingImages: uploadedImages,
+        unboxingVideo: uploadedVideo,
+        phoneNumber,
+        reason,
+    });
+
+    // 11. Send response
+    return res.status(201).json({
+        success: true,
+        message: "Return request created successfully.",
+        data: returnRequest,
+    });
+});
+
+
 module.exports = {
     createOrderByUser,
     getMyordersDetails,
     razorpayWebhooks,
     cancelSingleOrderByUser,
-    getliveTrackingDetails
+    getliveTrackingDetails,
+    createReturnRequest
 }

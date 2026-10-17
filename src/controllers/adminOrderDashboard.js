@@ -2,7 +2,9 @@ const Order = require('../models/orders.model')
 const User = require('../models/user.model')
 const Ordergroup = require('../models/orderGoup.model')
 const Product = require('../models/product.model')
+const cloudinary = require('../config/cloudinary')
 const { getStartOfTodayIST, timeAgo } = require('../helpers/calculatePlacedTime')
+const ReturnRequest = require('../models/ReturnRequest.model')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError } = require('../errors/errorConfig')
 
@@ -676,13 +678,100 @@ const reacentOrders = asyncHandler(async (req, res) => {
     });
 });
 
+const getreturnRequestDetails = asyncHandler(async (req, res) => {
+    const { role } = req.user;
+
+    // 1. Only admin can access return requests
+    if (role !== "admin") {
+        return res.status(403).json({
+            success: false,
+            message: "Only admin can access return requests.",
+        });
+    }
+
+    // 2. Fetch all return requests
+    const returnRequests = await ReturnRequest.find()
+        .sort({ createdAt: -1 })
+        .lean();
+
+    // 3. Fetch order details and generate video URLs
+    const returnRequestsWithDetails = await Promise.all(
+        returnRequests.map(async (request) => {
+            // Fetch corresponding order
+            const order = await Order.findById(request.orderId)
+                .select("items order_id order_status")
+                .lean();
+
+            // Generate Cloudinary video URL and thumbnail
+            let videoUrl = null;
+            let thumbnailUrl = null;
+
+            if (request.unboxingVideo?.public_id) {
+                const publicId = request.unboxingVideo.public_id;
+
+                videoUrl = cloudinary.url(publicId, {
+                    resource_type: "video",
+                    secure: true,
+                });
+
+                thumbnailUrl = cloudinary.url(publicId, {
+                    resource_type: "video",
+                    secure: true,
+                    format: "jpg",
+                    transformation: [
+                        {
+                            start_offset: "2",
+                        },
+                        {
+                            width: 500,
+                            crop: "fill",
+                        },
+                    ],
+                });
+            }
+
+            return {
+                ...request,
+
+                // Keep the original orderId and add order information
+                orderDetails: order
+                    ? {
+                        orderId: order._id,
+                        order_id: order.order_id,
+                        order_status: order.order_status,
+                        items: order.items,
+                    }
+                    : null,
+
+                // Return generated URLs without changing the database
+                unboxingVideo: request.unboxingVideo
+                    ? {
+                        public_id: request.unboxingVideo.public_id,
+                        videoUrl,
+                        thumbnailUrl,
+                    }
+                    : null,
+            };
+        })
+    );
+
+    return res.status(200).json({
+        success: true,
+        message: "Return requests fetched successfully.",
+        count: returnRequestsWithDetails.length,
+        data: returnRequestsWithDetails,
+    });
+});
+
+
 module.exports = {
     getAllOrders,
     getOrderfullDetails,
     getOrderWithStatus,
     getLowStockproductDetails,
     getOrderWeeklyOverview,
-    reacentOrders
+    reacentOrders,
+    getreturnRequestDetails
 }
 
 

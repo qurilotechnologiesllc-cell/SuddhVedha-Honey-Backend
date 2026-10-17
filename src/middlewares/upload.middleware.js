@@ -5,29 +5,32 @@ const storage = multer.memoryStorage()
 
 const fileFilter = (req, file, cb) => {
     const allowedImages = [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/webp'
-    ]
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+    ];
 
     const allowedVideos = [
-        'video/mp4',
-        'video/mpeg',
-        'video/quicktime'
-    ]
+        "video/mp4",
+        "video/mpeg",
+        "video/quicktime",
+    ];
 
-    const allowed = [...allowedImages, ...allowedVideos]
-
-    if (allowed.includes(file.mimetype)) {
-        cb(null, true)
-    } else {
-        cb(
-            new Error('Invalid file! Only jpg/png/webp/mp4 allowed'),
-            false
-        )
+    if (
+        allowedImages.includes(file.mimetype) ||
+        allowedVideos.includes(file.mimetype)
+    ) {
+        return cb(null, true);
     }
-}
+
+    cb(
+        new Error(
+            "Invalid file type. Only JPG, PNG, WEBP and supported video formats are allowed."
+        ),
+        false
+    );
+};
 
 // Single file upload ke liye
 const uploadSingle = multer({
@@ -50,4 +53,22 @@ const uploadVideo = multer({
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 }).single('video')
 
-module.exports = { uploadSingle, uploadMultiple, uploadVideo }
+const uploadReturnEvidence = multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: 50 * 1024 * 1024,
+        files: 6,
+    },
+}).fields([
+    {
+        name: "packagingImages",
+        maxCount: 5,
+    },
+    {
+        name: "unboxingVideo",
+        maxCount: 1,
+    },
+]);
+
+module.exports = { uploadSingle, uploadMultiple, uploadVideo, uploadReturnEvidence }
