@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Order = require('../models/orders.model')
 const User = require('../models/user.model')
 const Ordergroup = require('../models/orderGoup.model')
@@ -763,6 +764,107 @@ const getreturnRequestDetails = asyncHandler(async (req, res) => {
     });
 });
 
+const adminApprovedOrRejectReturnRequest = asyncHandler(async (req, res) => {
+    const { role, id: adminId } = req.user;
+
+    const { returnRequestsId, status, adminNote } = req.body;
+
+    // 1. Admin authorization
+    if (role !== "admin") {
+        return res.status(403).json({
+            success: false,
+            message: "Only admin can review return requests.",
+        });
+    }
+
+    // 2. Validate request ID
+    if (!returnRequestsId) {
+        return res.status(400).json({
+            success: false,
+            message: "returnRequestsId is required.",
+        });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(returnRequestsId)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid returnRequestsId.",
+        });
+    }
+
+    // 3. Validate status
+    const allowedStatuses = [
+        "under_review",
+        "approved",
+        "rejected",
+    ];
+
+    if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+            success: false,
+            message:
+                "Invalid status. Allowed values: under_review, approved, rejected.",
+        });
+    }
+
+    // 4. Rejection requires an explanation
+    if (
+        status === "rejected" &&
+        (typeof adminNote !== "string" || !adminNote.trim())
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: "Admin note is required when rejecting a return request.",
+        });
+    }
+
+    // 5. Find return request
+    const returnRequest = await ReturnRequest.findById(
+        returnRequestsId
+    );
+
+    if (!returnRequest) {
+        return res.status(404).json({
+            success: false,
+            message: "Return request not found.",
+        });
+    }
+
+    // 6. Prevent changes after a final decision
+    if (
+        ["approved", "rejected"].includes(returnRequest.status)
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: `This return request has already been ${returnRequest.status}.`,
+        });
+    }
+
+    const note = typeof adminNote === "string" ? adminNote.trim() : "";
+
+    // 7. Update current status and latest admin note
+    returnRequest.status = status;
+    returnRequest.adminNote = note;
+
+    // 8. Record the review history
+    returnRequest.reviewHistory.push({
+        status,
+        adminNote: note,
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+    });
+
+    // 9. Save changes
+    await returnRequest.save();
+
+    return res.status(200).json({
+        success: true,
+        message: `Return request ${status.replace("_", " ")} successfully.`,
+        data: returnRequest,
+    });
+}
+);
+
 
 module.exports = {
     getAllOrders,
@@ -771,7 +873,8 @@ module.exports = {
     getLowStockproductDetails,
     getOrderWeeklyOverview,
     reacentOrders,
-    getreturnRequestDetails
+    getreturnRequestDetails,
+    adminApprovedOrRejectReturnRequest
 }
 
 
