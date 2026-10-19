@@ -131,11 +131,11 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
     });
   }
 
-  if(orderGroup.payment_mode !=="cod" && orderGroup.payment_status !== "paid") {
+  if (orderGroup.payment_mode !== "cod" && orderGroup.payment_status !== "paid") {
     return res.status(400).json({
       success: false,
       message: "If payment mode is not COD, then payment status must be paid to create order on Velocity",
-    }); 
+    });
   }
 
   // ---------------------------------------------------
@@ -791,10 +791,6 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
         "========== VELOCITY WEBHOOK =========="
       );
 
-      console.log(
-        JSON.stringify(webhookData, null, 2)
-      );
-
       const {
         event,
         event_id,
@@ -850,11 +846,8 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
       const maxAttempts = 5;
       const retryDelay = 500;
 
-      for (
-        let attempt = 1;
-        attempt <= maxAttempts;
-        attempt++
-      ) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+
         const conditions = [];
 
         if (shipment_id) {
@@ -881,16 +874,12 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
           });
         }
 
-        velocityOrder =
-          await VelocitySchema.findOne({
-            $or: conditions,
-          });
+        velocityOrder = await VelocitySchema.findOne({
+          $or: conditions,
+        });
 
         if (velocityOrder) {
-          console.log(
-            `Velocity shipment found on attempt ${attempt}`
-          );
-
+          console.log(`Velocity shipment found on attempt ${attempt}`);
           break;
         }
 
@@ -910,8 +899,7 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
       // -----------------------------------------
 
       if (!velocityOrder) {
-        console.warn(
-          "Velocity shipment not found after retries",
+        console.warn("Velocity shipment not found after retries",
           {
             shipment_id,
             tracking_number,
@@ -977,16 +965,13 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
       // 7. Update current tracking
       // -----------------------------------------
 
-      velocityOrder.tracking.current =
-        trackingEvent;
+      velocityOrder.tracking.current = trackingEvent;
 
       // -----------------------------------------
       // 8. Add tracking history
       // -----------------------------------------
 
-      velocityOrder.tracking.history.push(
-        trackingEvent
-      );
+      velocityOrder.tracking.history.push(trackingEvent);
 
       velocityOrder.markModified("tracking");
 
@@ -1021,6 +1006,10 @@ const orderTrackingByVelocityWebhooks = asyncHandler(
             // -----------------------------------------
 
             order.order_status = velocityStatus;
+
+            if (velocityStatus === "delivered" && order.payment_mode === "cod") {
+              order.payment_status = "paid";
+            }
 
             await order.save();
 
