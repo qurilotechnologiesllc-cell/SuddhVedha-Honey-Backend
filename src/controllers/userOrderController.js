@@ -1355,6 +1355,70 @@ const getMyordersDetails = asyncHandler(async (req, res) => {
 
 });
 
+const getOrderDetailsByOrderId = asyncHandler(async (req, res) => {
+    const { id: userId } = req.user;
+    const { orderId } = req.params;
+
+    // 1. Validate orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid orderId.",
+        });
+    }
+
+    // 2. Find order belonging to the logged-in user
+    const order = await Order.findOne({
+        _id: orderId,
+        userId,
+    }).lean();
+
+    if (!order) {
+        return res.status(404).json({
+            success: false,
+            message: "Order not found.",
+        });
+    }
+
+    // 3. Find return request for this order
+    const returnRequest = await ReturnRequest.findOne({
+        orderId: order._id,
+        userId,
+    })
+        .select("status adminNote reason reviewHistory")
+        .lean();
+
+    // 4. Prepare response
+    const responseData = {
+        _id: order._id,
+        order_id: order.order_id,
+        order_group_id: order.order_group_id,
+
+        items: order.items,
+
+        totalAmount: order.totalAmount,
+
+        payment_mode: order.payment_mode,
+        payment_status: order.payment_status,
+        order_status: order.order_status,
+
+        returnRequest: returnRequest
+            ? {
+                status: returnRequest.status,
+                adminNote: returnRequest.adminNote || "",
+                reason: returnRequest.reason,
+                reviewHistory: returnRequest.reviewHistory || [],
+            }
+            : null,
+    };
+
+    return res.status(200).json({
+        success: true,
+        message: "Order details fetched successfully.",
+        data: responseData,
+    });
+});
+
 const razorpayWebhooks = asyncHandler(async (req, res) => {
 
     const webhookSignature = req.headers["x-razorpay-signature"];
@@ -2985,8 +3049,9 @@ const createReturnRequest = asyncHandler(async (req, res) => {
 module.exports = {
     createOrderByUser,
     getMyordersDetails,
+    getOrderDetailsByOrderId,
     razorpayWebhooks,
     cancelSingleOrderByUser,
     getliveTrackingDetails,
-    createReturnRequest
+    createReturnRequest,
 }
