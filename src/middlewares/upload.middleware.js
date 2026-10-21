@@ -32,6 +32,13 @@ const fileFilter = (req, file, cb) => {
     );
 };
 
+const pdfFileFilter = (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+        return cb(null, true);
+    }
+    cb(new Error("Invalid file type. Only PDF files are allowed."), false);
+};
+
 // Single file upload ke liye
 const uploadSingle = multer({
     storage,
@@ -53,6 +60,13 @@ const uploadVideo = multer({
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 }).single('video')
 
+const uploadPdf = multer({
+    storage,
+    fileFilter: pdfFileFilter,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+}).single('report');
+
+
 const uploadReturnEvidence = multer({
     storage,
     fileFilter,
@@ -71,4 +85,14 @@ const uploadReturnEvidence = multer({
     },
 ]);
 
-module.exports = { uploadSingle, uploadMultiple, uploadVideo, uploadReturnEvidence }
+const validatePdfBuffer = (req, res, next) => {
+    if (!req.file) {
+        return res.status(400).json({ message: "PDF file is required" });
+    }
+    if (req.file.buffer.subarray(0, 4).toString() !== "%PDF") {
+        return res.status(400).json({ message: "Uploaded file is not a valid PDF" });
+    }
+    next();
+};
+
+module.exports = { uploadSingle, uploadMultiple, uploadVideo, uploadReturnEvidence, uploadPdf }

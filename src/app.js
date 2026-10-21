@@ -37,6 +37,7 @@ const productDashboardRoutes = require('./routes/productDashboardRoute');
 const notificationRoutes = require('./routes/notificationRoute');
 const SubscripationsPlans = require('./routes/plansRoute.js');
 const adminOrderDashboardRoutes = require('./routes/adminOrderDashboardRoute.js');
+const honeyLabReportsRoutes = require('./routes/honeyLabReportsRoutes.js');
 
 // Order Services
 const adminConfirmOrderOnVelocity = require('./routes/adminConfirmOrderOnVelocityRoute.js');
@@ -80,14 +81,14 @@ app.use(cors({
     "https://k8jz7ljm-3051.inc1.devtunnels.ms",
 
     "https://shuddhvedaadmin.vercel.app",
-    
+
     "https://www.shuddhvedahoney.com",
 
     "https://admin.shuddhvedahoney.com",
 
     "https://launch.shuddhvedahoney.com",
 
-    "http://launch.shuddhvedahoney.com", 
+    "http://launch.shuddhvedahoney.com",
 
     "https://r7bmx3wg-3050.inc1.devtunnels.ms"
   ],
@@ -145,6 +146,7 @@ app.use('/api/notification', notificationRoutes);
 app.use('/api/subscripation/plan', SubscripationsPlans);
 app.use('/api/admin/plan-orders', adminPlanOrdersRoute);
 app.use('/api/admin/order-dashboard', adminOrderDashboardRoutes);
+app.use('/api/admin/lab-report', honeyLabReportsRoutes);
 
 // Order Services
 app.use('/api/order-service', adminConfirmOrderOnVelocity);

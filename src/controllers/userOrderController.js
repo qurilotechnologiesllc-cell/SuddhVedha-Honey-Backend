@@ -56,7 +56,28 @@ const generateOrderId = () => {
     const random = crypto.randomBytes(4).toString('hex').toUpperCase()
 
     return `SV - ${yyyy}${mm}${dd} -${random}`
-}
+};
+
+const generateReturnId = () => {
+    const date = new Date();
+
+    const yyyy = date.getUTCFullYear();
+
+    const mm = String(
+        date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    const dd = String(
+        date.getUTCDate()
+    ).padStart(2, "0");
+
+    const random = crypto
+        .randomBytes(4)
+        .toString("hex")
+        .toUpperCase();
+
+    return `SR-${yyyy}${mm}${dd}-${random}`;
+};
 
 const createOrderByUser = asyncHandler(async (req, res) => {
 
@@ -3026,8 +3047,11 @@ const createReturnRequest = asyncHandler(async (req, res) => {
         public_id: videoResult.public_id,
     };
 
+    const return_id = generateReturnId()
+
     // 10. Create ReturnRequest document
     const returnRequest = await ReturnRequest.create({
+        return_id,
         userId,
         orderId: order._id,
         orderGroupId,

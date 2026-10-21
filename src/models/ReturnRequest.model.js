@@ -52,6 +52,14 @@ const reviewHistorySchema = new Schema(
 
 const returnRequestSchema = new Schema(
     {
+
+        return_id: {
+            type: String,
+            required: true,
+            unique: true,
+            index: true,
+        },
+
         userId: {
             type: Schema.Types.ObjectId,
             ref: "User",

@@ -84,4 +84,35 @@ const deleteFromCloudinary = (
 
 };
 
-module.exports = { uploadToCloudinary, uploadVideoToCloudinary, deleteFromCloudinary }
+const uploadPdfToCloudinary = (buffer, folder, originalName = 'document') => {
+    // clean file name, so the stored URL ends with .pdf
+    const baseName = originalName
+        .replace(/\.pdf$/i, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 50);
+
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'raw',                    // PDFs are stored as raw files
+                public_id: `${baseName}-${Date.now()}.pdf`, // for raw files the extension must be part of public_id
+                overwrite: false,
+            },
+            (error, result) => {
+                if (error) return reject(error);
+
+                resolve({
+                    public_id: result.public_id,
+                    url: result.secure_url,
+                    bytes: result.bytes,
+                    resource_type: result.resource_type,
+                });
+            }
+        );
+
+        stream.end(buffer);
+    });
+};
+
+module.exports = { uploadToCloudinary, uploadVideoToCloudinary, deleteFromCloudinary, uploadPdfToCloudinary }
