@@ -5,7 +5,11 @@ const ProductImage = require("../models/productImage.model")
 const ProductVariant = require('../models/productVariant.model')
 const ProductVideo = require('../models/productVideo.model')
 const cloudinary = require('../config/cloudinary')
+const redis = require('../utils/redis')
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
+
+const PRODUCTS_CACHE_KEY = 'products:all:v1';
+const PRODUCTS_CACHE_TTL = 60 * 10; // 10 minutes (seconds me)
 
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
@@ -98,7 +102,24 @@ const createProduct = asyncHandler(async (req, res) => {
 });
 
 const getAllProducts = asyncHandler(async (req, res) => {
-    // 1. .lean() add kiya taaki hum data ko JS array ki tarah manipulate kar sakein
+
+    // 1. Pehle Redis check karo
+    try {
+        const cached = await redis.get(PRODUCTS_CACHE_KEY);
+        if (cached) {
+            res.set('X-Cache', 'HIT');
+            // cached already JSON string hai, parse/stringify dobara nahi karna -> fast
+            return res
+                .status(200)
+                .type('application/json')
+                .send(`{"success":true,"data":${cached}}`);
+        }
+    } catch (err) {
+        // Redis down ho to bhi API chalni chahiye, DB se data dena hai
+        console.error('Redis get failed:', err.message);
+    }
+
+    // 2. Cache miss -> DB se data lo
     const products = await Product.find({ is_active: true })
         .populate({
             path: 'categoryId',
@@ -113,32 +134,34 @@ const getAllProducts = asyncHandler(async (req, res) => {
             select: 'variants -_id'
         })
         .select('-createdAt -__v')
-        .lean(); // <-- Super Important!
+        .lean();
 
-    // 2. Loop chalakar har product ki images array me se sirf pehli image nikaal li
-    const formattedProducts = products.map(product => {
-        let singleImage = null;
-        let singleVariant = null;
+    const formattedProducts = products.map(product => ({
+        ...product,
+        imageDocumentId: product.imageDocumentId?.images?.length
+            ? product.imageDocumentId.images
+            : null,
+        variantDocumentId: product.variantDocumentId?.variants?.length
+            ? product.variantDocumentId.variants
+            : null,
+    }));
 
-        // Check kiya ki images object aur uske andar ka images array exist karta hai ya nahi
-        if (product.imageDocumentId && product.imageDocumentId.images && product.imageDocumentId.images.length > 0) {
-            singleImage = product.imageDocumentId.images; // Sirf pehla image object uthaya
-        }
-        // Variants array se 1st variant nikala
-        if (product.variantDocumentId && product.variantDocumentId.variants && product.variantDocumentId.variants.length > 0) {
-            singleVariant = product.variantDocumentId.variants;
-        }
+    // 3. Redis me save karo (fail ho jaye to bhi response jayega)
+    try {
+        await redis.set(
+            PRODUCTS_CACHE_KEY,
+            JSON.stringify(formattedProducts),
+            'EX',
+            PRODUCTS_CACHE_TTL
+        );
+    } catch (err) {
+        console.error('Redis set failed:', err.message);
+    }
 
-        return {
-            ...product,
-            imageDocumentId: singleImage, // Pura object hata kar sirf single image object set kar diya
-            variantDocumentId: singleVariant
-        };
-    });
-
+    res.set('X-Cache', 'MISS');
     res.status(200).json({
         success: true,
-        data: formattedProducts // Modified data bheja
+        data: formattedProducts
     });
 });
 

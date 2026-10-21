@@ -40,16 +40,16 @@ const getAllHoneyLabReports = asyncHandler(async (req, res) => {
 });
 
 const removeHoneylabReports = asyncHandler(async (req, res) => {
-    // const { role } = req.user;
+    const { role } = req.user;
     const { reportId } = req.params;
 
-    // // only admin can delete (change this to match your role names)
-    // if (role !== "admin") {
-    //     return res.status(403).json({
-    //         success: false,
-    //         message: "You are not allowed to delete lab reports",
-    //     });
-    // }
+    // only admin can delete (change this to match your role names)
+    if (role !== "admin") {
+        return res.status(403).json({
+            success: false,
+            message: "You are not allowed to delete lab reports",
+        });
+    }
 
     if (!mongoose.isValidObjectId(reportId)) {
         return res.status(400).json({

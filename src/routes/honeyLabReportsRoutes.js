@@ -6,6 +6,6 @@ const { createLabReport, getAllHoneyLabReports, removeHoneylabReports} = require
 
 router.post('/upload', uploadPdf, createLabReport);
 router.get('/all', getAllHoneyLabReports);
-router.delete('/remove/:reportId', removeHoneylabReports);
+router.delete('/remove/:reportId', authMiddleware, removeHoneylabReports);
 
 module.exports = router
