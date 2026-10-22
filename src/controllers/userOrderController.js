@@ -194,10 +194,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
     if (couponCode) {
 
-        const normalizedCouponCode =
-            couponCode
-                .trim()
-                .toUpperCase();
+        const normalizedCouponCode = couponCode.trim().toUpperCase();
 
 
         /*
@@ -233,8 +230,7 @@ const createOrderByUser = asyncHandler(async (req, res) => {
         |--------------------------------------------------------------------------
         */
 
-        couponUsage =
-            await CouponUsage.findOne({
+        couponUsage = await CouponUsage.findOne({
 
                 userId:
                     user._id,

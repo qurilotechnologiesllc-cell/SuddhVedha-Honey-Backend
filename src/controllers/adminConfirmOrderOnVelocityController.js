@@ -782,360 +782,122 @@ const cancelOrderByAdmin = asyncHandler(async (req, res) => {
   });
 });
 
-const orderTrackingByVelocityWebhooks = asyncHandler(
-  async (req, res) => {
-    try {
-      const webhookData = req.body;
+// this function finds a Velocity order based on the provided identifiers.
+const findVelocityOrder = async ({ shipment_id, tracking_number, order_id, order_external_id }) => {
+  // 1. Strong identifiers: sirf SUCCESS shipment pe hi milenge
+  const strong = [];
+  if (shipment_id) strong.push({ shipmentId: shipment_id });
+  if (tracking_number) strong.push({ awbCode: tracking_number });
+  if (order_id) strong.push({ velocityOrderId: order_id });
 
-      console.log(
-        "========== VELOCITY WEBHOOK =========="
-      );
+  if (strong.length) {
+    const doc = await VelocitySchema.findOne({ $or: strong, status: "SUCCESS" })
+      .sort({ createdAt: -1 });
+    if (doc) return doc;
+  }
 
-      const {
-        event,
-        event_id,
-        data,
-      } = webhookData;
+  // 2. Fallback: merchantOrderId, lekin FAILED kabhi nahi
+  if (order_external_id) {
+    return VelocitySchema.findOne({
+      merchantOrderId: order_external_id,
+      status: "SUCCESS",
+    }).sort({ createdAt: -1 });
+  }
 
-      // -----------------------------------------
-      // 1. Basic payload validation
-      // -----------------------------------------
+  return null;
+};
 
-      if (!event || !event_id || !data) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid Velocity webhook payload",
-        });
+const orderTrackingByVelocityWebhooks = asyncHandler(async (req, res) => {
+  try {
+    const { event, event_id, data } = req.body;
+
+    if (!event || !event_id || !data) {
+      return res.status(400).json({ success: false, message: "Invalid Velocity webhook payload" });
+    }
+
+    const { shipment_id, tracking_number, order_id, order_external_id, status: velocityStatus } = data;
+
+    if (!shipment_id && !tracking_number && !order_id && !order_external_id) {
+      return res.status(400).json({ success: false, message: "Shipment ID, AWB, order ID or external order ID is required" });
+    }
+    if (!velocityStatus) {
+      return res.status(400).json({ success: false, message: "Shipment status is missing" });
+    }
+
+    // 1. Sirf SUCCESS document dhoondho (retry ke saath)
+    let velocityOrder = null;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      velocityOrder = await findVelocityOrder({ shipment_id, tracking_number, order_id, order_external_id });
+      if (velocityOrder) break;
+      if (attempt < 5) await new Promise((r) => setTimeout(r, 500));
+    }
+
+    if (!velocityOrder) {
+      console.warn("Velocity SUCCESS shipment not found", { shipment_id, tracking_number, order_id, order_external_id });
+      return res.status(200).json({ success: true, message: "Webhook received but shipment not available yet" });
+    }
+
+    // 2. Atomic tracking update + duplicate guard
+    const trackingEvent = { ...req.body, received_at: new Date() };
+    const updated = await VelocitySchema.findOneAndUpdate(
+      { _id: velocityOrder._id, "tracking.history.event_id": { $ne: event_id } },
+      { $set: { "tracking.current": trackingEvent }, $push: { "tracking.history": trackingEvent } },
+      { new: true }
+    );
+
+    if (!updated) console.log(`Duplicate Velocity webhook: ${event_id}`);
+
+    // 3. Orders sync (idempotent, duplicate pe bhi safe)
+    await syncOrders(velocityOrder.orderIds, velocityStatus);
+
+    return res.status(200).json({
+      success: true,
+      message: updated ? "Velocity tracking processed" : "Webhook already processed",
+      data: { event, status: velocityStatus, orderIds: velocityOrder.orderIds },
+    });
+  } catch (error) {
+    console.error("Velocity Tracking Webhook Error:", error);
+    return res.status(500).json({ success: false, message: "Velocity webhook processing failed" });
+  }
+});
+
+// this function synchronizes the order status in the Order collection based on the provided order IDs and the new velocity status.
+const syncOrders = async (orderIds, velocityStatus) => {
+  if (!orderIds?.length) return;
+
+  for (const orderId of orderIds) {
+    // Sirf tab update karo jab status badla ho; purana doc wapas milta hai (new: false)
+    const prev = await Order.findOneAndUpdate(
+      { _id: orderId, order_status: { $ne: velocityStatus } },
+      { $set: { order_status: velocityStatus } },
+      { new: false, select: "_id order_status plan_purchase_id payment_mode" }
+    );
+
+    if (!prev) continue; // status pehle se same tha, kuch nahi karna
+
+    if (velocityStatus === "delivered") {
+      if (prev.payment_mode === "cod") {
+        await Order.updateOne({ _id: orderId }, { $set: { payment_status: "paid" } });
       }
 
-      const {
-        shipment_id,
-        tracking_number,
-        order_id,
-        order_external_id,
-        status: velocityStatus,
-      } = data;
-
-      if (
-        !shipment_id &&
-        !tracking_number &&
-        !order_id &&
-        !order_external_id
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Shipment ID, AWB, order ID or external order ID is required",
-        });
-      }
-
-      if (!velocityStatus) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Shipment status is missing from Velocity webhook",
-        });
-      }
-
-      // -----------------------------------------
-      // 2. Find VelocityOrder
-      // -----------------------------------------
-
-      let velocityOrder = null;
-
-      const maxAttempts = 5;
-      const retryDelay = 500;
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-
-        const conditions = [];
-
-        if (shipment_id) {
-          conditions.push({
-            shipmentId: shipment_id,
-          });
-        }
-
-        if (tracking_number) {
-          conditions.push({
-            awbCode: tracking_number,
-          });
-        }
-
-        if (order_id) {
-          conditions.push({
-            velocityOrderId: order_id,
-          });
-        }
-
-        if (order_external_id) {
-          conditions.push({
-            merchantOrderId: order_external_id,
-          });
-        }
-
-        velocityOrder = await VelocitySchema.findOne({
-          $or: conditions,
-        });
-
-        if (velocityOrder) {
-          console.log(`Velocity shipment found on attempt ${attempt}`);
-          break;
-        }
-
-        console.log(
-          `Velocity shipment not found. Attempt ${attempt}/${maxAttempts}`
-        );
-
-        if (attempt < maxAttempts) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, retryDelay)
-          );
-        }
-      }
-
-      // -----------------------------------------
-      // 3. VelocityOrder not found
-      // -----------------------------------------
-
-      if (!velocityOrder) {
-        console.warn("Velocity shipment not found after retries",
+      if (prev.plan_purchase_id) {
+        // Atomic: total se zyada kabhi increment nahi hoga
+        await PurchasePlanDetails.updateOne(
           {
-            shipment_id,
-            tracking_number,
-            order_id,
-            order_external_id,
-          }
-        );
-
-        return res.status(200).json({
-          success: true,
-          message:
-            "Webhook received but shipment was not available yet",
-        });
-      }
-
-      // -----------------------------------------
-      // 4. Initialize tracking
-      // -----------------------------------------
-
-      if (!velocityOrder.tracking) {
-        velocityOrder.tracking = {
-          current: null,
-          history: [],
-        };
-      }
-
-      if (!velocityOrder.tracking.history) {
-        velocityOrder.tracking.history = [];
-      }
-
-      // -----------------------------------------
-      // 5. Prevent duplicate webhook
-      // -----------------------------------------
-
-      const alreadyProcessed =
-        velocityOrder.tracking.history.some(
-          (trackingEvent) =>
-            trackingEvent.event_id === event_id
-        );
-
-      if (alreadyProcessed) {
-        console.log(
-          `Duplicate Velocity webhook ignored: ${event_id}`
-        );
-
-        return res.status(200).json({
-          success: true,
-          message:
-            "Webhook already processed",
-        });
-      }
-
-      // -----------------------------------------
-      // 6. Create complete tracking event
-      // -----------------------------------------
-
-      const trackingEvent = {
-        ...webhookData,
-        received_at: new Date(),
-      };
-
-      // -----------------------------------------
-      // 7. Update current tracking
-      // -----------------------------------------
-
-      velocityOrder.tracking.current = trackingEvent;
-
-      // -----------------------------------------
-      // 8. Add tracking history
-      // -----------------------------------------
-
-      velocityOrder.tracking.history.push(trackingEvent);
-
-      velocityOrder.markModified("tracking");
-
-      // -----------------------------------------
-      // 9. Save Velocity tracking
-      // -----------------------------------------
-
-      await velocityOrder.save();
-
-      // =================================================
-      // 10. UPDATE ORDER STATUS
-      // =================================================
-
-      const orderIds = velocityOrder.orderIds || [];
-
-      if (orderIds.length > 0) {
-
-        const orders = await Order.find({
-          _id: {
-            $in: orderIds,
+            _id: prev.plan_purchase_id,
+            $expr: {
+              $or: [
+                { $eq: [{ $ifNull: ["$totalDeliveries", 0] }, 0] },
+                { $lt: [{ $ifNull: ["$completedDeliveries", 0] }, "$totalDeliveries"] },
+              ],
+            },
           },
-        }).select("_id order_status plan_purchase_id");
-
-        if (orders.length > 0) {
-
-          for (const order of orders) {
-
-            const previousOrderStatus = order.order_status;
-
-            // -----------------------------------------
-            // Update Order Status
-            // -----------------------------------------
-
-            order.order_status = velocityStatus;
-
-            if (velocityStatus === "delivered" && order.payment_mode === "cod") {
-              order.payment_status = "paid";
-            }
-
-            await order.save();
-
-            console.log("Order status updated:", {
-              orderId: order._id,
-              previousStatus: previousOrderStatus,
-              newStatus: velocityStatus,
-            });
-
-            // -----------------------------------------
-            // PLAN DELIVERY COMPLETION
-            // -----------------------------------------
-
-            if (
-              velocityStatus === "delivered" &&
-              previousOrderStatus !== "delivered" &&
-              order.plan_purchase_id
-            ) {
-
-              const purchase = await PurchasePlanDetails.findById(
-                order.plan_purchase_id
-              );
-
-              if (!purchase) {
-
-                console.warn(
-                  "Purchase plan not found for delivered order",
-                  {
-                    orderId: order._id,
-                    planPurchaseId: order.plan_purchase_id,
-                  }
-                );
-
-                continue;
-              }
-
-              // -----------------------------------------
-              // Prevent completedDeliveries overflow
-              // -----------------------------------------
-
-              const totalDeliveries =
-                Number(purchase.totalDeliveries || 0);
-
-              const completedDeliveries =
-                Number(purchase.completedDeliveries || 0);
-
-              // -----------------------------------------
-              // Increment completed deliveries
-              // -----------------------------------------
-
-              if (totalDeliveries === 0 || completedDeliveries < totalDeliveries) {
-
-                purchase.completedDeliveries = completedDeliveries + 1;
-
-                await purchase.save();
-
-                console.log(
-                  "Plan completedDeliveries updated:",
-                  {
-                    planPurchaseId:
-                      purchase._id,
-                    orderId: order._id,
-                    completedDeliveries:
-                      purchase.completedDeliveries,
-                    totalDeliveries:
-                      purchase.totalDeliveries,
-                  }
-                );
-              } else {
-
-                console.warn(
-                  "completedDeliveries already reached totalDeliveries",
-                  {
-                    planPurchaseId:
-                      purchase._id,
-                    completedDeliveries,
-                    totalDeliveries,
-                  }
-                );
-              }
-            }
-          }
-        }
-
-      } else {
-
-        console.warn(
-          "No orderIds found in VelocityOrder",
-          {
-            velocityOrderId:
-              velocityOrder.velocityOrderId,
-            shipmentId:
-              velocityOrder.shipmentId,
-          }
+          { $inc: { completedDeliveries: 1 } }
         );
       }
-      // -----------------------------------------
-      // 12. Success response
-      // -----------------------------------------
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "Velocity tracking webhook processed successfully",
-        data: {
-          event,
-          status: velocityStatus,
-          orderIds,
-        },
-      });
-
-    } catch (error) {
-
-      console.error(
-        "Velocity Tracking Webhook Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Velocity webhook processing failed",
-      });
     }
   }
-);
+};
 
 
 module.exports = {
