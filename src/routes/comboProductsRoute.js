@@ -3,7 +3,7 @@ const router = express.Router()
 const { authMiddleware } = require('../middlewares/authmiddleware')
 const { uploadSingle, uploadMultiple } = require('../middlewares/upload.middleware')
 
-const { createComboProduct, updateComboproductinfo, uploadComboProductImage, deleteImageOfComboProduct, updateComboProductImages, createSetPackOfcomboProduct, removeSetPackfromComboProduct, getAllcomboProducts, getComboProductDetails, getRandomComboProducts } = require('../controllers/combopackProductController')
+const { createComboProduct, updateComboproductinfo, uploadComboProductImage, deleteImageOfComboProduct, updateComboProductImages, createSetPackOfcomboProduct, removeSetPackfromComboProduct, getAllcomboProducts, getComboProductDetails, getRandomComboProducts, getComboTwoThreeAndFourProducts } = require('../controllers/combopackProductController')
 
 router.post('/create', createComboProduct)
 
@@ -25,5 +25,7 @@ router.get('/all/combo-products', getAllcomboProducts);
 router.get('/details/:comboProductId', getComboProductDetails);
 
 router.get('/recommended', getRandomComboProducts);
+
+router.get('/combo-products/2-3-4', getComboTwoThreeAndFourProducts);
 
 module.exports = router

@@ -1797,6 +1797,44 @@ const getRandomComboProducts = asyncHandler(async (req, res) => {
     });
 });
 
+const getComboTwoThreeAndFourProducts = asyncHandler(async (req, res) => {
+
+    const comboProducts = await ComboProduct.find({
+        combo_size: { $in: [2, 3, 4] }
+    }).limit(3).lean();
+
+    if (comboProducts.length === 0) {
+        return res.status(200).json({
+            success: true,
+            message: "No combo products found.",
+            data: []
+        });
+    }
+
+    const comboProductIds = comboProducts.map(cp => cp._id);
+
+    const comboProductImages = await ComboProductImage.find({
+        comboProductId: { $in: comboProductIds }
+    }).lean();
+
+    const imageMap = {};
+
+    comboProductImages.forEach(doc => {
+        imageMap[doc.comboProductId.toString()] = doc.images || [];
+    });
+
+    const data = comboProducts.map(cp => ({
+        ...cp,
+        images: imageMap[cp._id.toString()] || []
+    }));
+
+    return res.status(200).json({
+        success: true,
+        message: "Combo products with size 2, 3, and 4 fetched successfully.",
+        data
+    });
+});
+
 
 module.exports = {
     createComboProduct,
@@ -1808,6 +1846,6 @@ module.exports = {
     getAllcomboProducts,
     getComboProductDetails,
     removeSetPackfromComboProduct,
-    getRandomComboProducts
-
+    getRandomComboProducts,
+    getComboTwoThreeAndFourProducts,
 }
