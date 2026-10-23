@@ -291,4 +291,51 @@ const sendWelcomeEmail = async (userEmail) => {
     }
 }
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail };
+const sendEmailforSuccesfullPayment = async (userEmail, paymentDetails = {}) => {
+    try {
+        const {
+            customer_name,
+            transaction_amount,
+            order_date,
+            transaction_id,
+            payment_method,
+            payment_date,
+            order_number,
+        } = paymentDetails;
+
+        console.log(paymentDetails)
+
+        const response = await brevo.transactionalEmails.sendTransacEmail({
+            sender: {
+                email: process.env.BREVO_SENDER_EMAIL,
+                name: process.env.BREVO_SENDER_NAME,
+            },
+            to: [{ email: userEmail, name: customer_name }],
+
+            templateId: Number(process.env.BREVO_PAYMENT_SUCCESS_TEMPLATE_ID),
+
+            params: {
+                customer_name: customer_name,
+                transaction_amount: transaction_amount,
+                order_date: order_date,
+                transaction_id: transaction_id,
+                payment_method: payment_method,
+                payment_date,
+
+                // Subject aur preview text ke liye
+                order_number,
+                payment_amount: transaction_amount,
+            },
+        });
+
+        console.log('✅ Payment success email sent:', response?.messageId || response);
+
+        return { success: true, data: response };
+    } catch (error) {
+        console.error('❌ Payment success email failed:', error?.message || error);
+
+        return { success: false, error: error?.message || 'Failed to send email' };
+    }
+};
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment };

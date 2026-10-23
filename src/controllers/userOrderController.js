@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const redis = require('../utils/redis')
 const Order = require('../models/orders.model');
 const Ordergroup = require('../models/orderGoup.model')
 const User = require('../models/user.model')
@@ -13,14 +14,14 @@ const razorpay = require('../utils/razorpay')
 const validateOrderItems = require('../errors/ordervalidation')
 const removeOrderedItemsFromCart = require('../services/removeOrderedItemsFromCart.service');
 const { checkStockBeforeOrder, updateStockAfterOrder } = require('../services/stockService');
-const updateOrderGroupAndOrders = require('../services/updateOrderGroupAndOrders');
+const updatePaymentStatusInOrdergroupAndOrder = require('../services/updatePaymentStatusInOrdergroupAndOrder');
 const { getIO, ADMIN_ROOM } = require('../utils/socketHandler');
 const updateOrderGroupRefundSummary = require('../helpers/updateOrderGroupRefundSummary')
-const redis = require('../utils/redis')
 const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/uploadToCloudinary')
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
+const sendPaymentSuccessEmail = require('../services/paymentEmail.service')
 
 const generateOrderGroupId = () => {
 
@@ -232,19 +233,19 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         couponUsage = await CouponUsage.findOne({
 
-                userId:
-                    user._id,
+            userId:
+                user._id,
 
-                offerId:
-                    offer._id,
+            offerId:
+                offer._id,
 
-                isApplied:
-                    true,
+            isApplied:
+                true,
 
-                isAvailable:
-                    true
+            isAvailable:
+                true
 
-            });
+        });
 
 
         if (!couponUsage) {
@@ -1502,16 +1503,16 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
         );
 
 
-    console.log(
-        "Webhook Data:",
-        webhookData
-    );
+    // console.log(
+    //     "Webhook Data:",
+    //     webhookData
+    // );
 
 
     const event = webhookData.event;
 
 
-    console.log(webhookData?.payload?.payment?.entity)
+    // console.log(webhookData?.payload?.payment?.entity)
 
     /*
     |--------------------------------------------------------------------------
@@ -1572,7 +1573,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |--------------------------------------------------------------------------
             */
 
-            await updateOrderGroupAndOrders({
+            await updatePaymentStatusInOrdergroupAndOrder({
 
                 orderGroup,
 
@@ -1710,7 +1711,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |--------------------------------------------------------------------------
             */
 
-            await updateOrderGroupAndOrders({
+            await updatePaymentStatusInOrdergroupAndOrder({
 
                 orderGroup,
 
@@ -1775,6 +1776,9 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 `Payment captured: ${orderGroup.group_id}`
             );
 
+            sendPaymentSuccessEmail(orderGroup, payment).catch((err) =>
+                console.error('Payment email failed:', err.message)
+            );
 
             break;
         }
@@ -1837,7 +1841,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |--------------------------------------------------------------------------
             */
 
-            await updateOrderGroupAndOrders({
+            await updatePaymentStatusInOrdergroupAndOrder({
 
                 orderGroup,
 
@@ -1998,7 +2002,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |
             */
 
-            await updateOrderGroupAndOrders({
+            await updatePaymentStatusInOrdergroupAndOrder({
 
                 orderGroup,
 

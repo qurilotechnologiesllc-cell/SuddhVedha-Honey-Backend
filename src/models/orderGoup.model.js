@@ -98,9 +98,10 @@ const orderGroupSchema = new mongoose.Schema({
             'netbanking',
             'wallet',
             'emi',
-            'cod'
+            'cod',
+            'online'
         ],
-        required: true
+        default: "online"
     },
 
     payment_status: {
@@ -187,6 +188,8 @@ const orderGroupSchema = new mongoose.Schema({
             ref: "Order"
         }
     ],
+
+    payment_email_sent: { type: Boolean, default: false },
 
 }, {
     timestamps: true

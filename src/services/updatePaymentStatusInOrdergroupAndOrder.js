@@ -1,12 +1,13 @@
 const Order = require('../models/orders.model')
 
-const updateOrderGroupAndOrders = async ({
+const updatePaymentStatusInOrdergroupAndOrder = async ({
     orderGroup,
     orderStatus,
     paymentStatus,
     paymentData
 }) => {
 
+    console.log(paymentData)
     /*
     |--------------------------------------------------------------------------
     | 1. Update OrderGroup
@@ -14,6 +15,10 @@ const updateOrderGroupAndOrders = async ({
     */
 
     orderGroup.payment_status = paymentStatus;
+    
+    if (paymentData.method) {
+        orderGroup.payment_mode = paymentData.method;
+    }
 
     orderGroup.payment = {
         ...orderGroup.payment,
@@ -53,4 +58,4 @@ const updateOrderGroupAndOrders = async ({
     );
 };
 
-module.exports = updateOrderGroupAndOrders
+module.exports = updatePaymentStatusInOrdergroupAndOrder
