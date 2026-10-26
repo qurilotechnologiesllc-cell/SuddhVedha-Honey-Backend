@@ -6,6 +6,8 @@ const PurchasePlanDetails = require("../models/purchaseplan.model");
 const axios = require("axios");
 const { checkDeliveryAvailabilityService } = require("../services/delivery.service");
 
+const { sendOrderConfirmedEmailByGroup } = require('../services/emails.service')
+
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError, ServiceUnavailableError } = require('../errors/errorConfig')
 
 const checkdeliveryavailability = asyncHandler(async (req, res) => {
@@ -498,6 +500,11 @@ const creareOrderByAdmin = asyncHandler(async (req, res) => {
         order_status: "confirmed",
       },
     }
+  );
+
+  // Email ka wait nahi karna, response jaldi jaye
+  sendOrderConfirmedEmailByGroup(orderGroup._id).catch((err) =>
+    console.error('Order confirmed email failed:', err.message)
   );
 
   // ---------------------------------------------------

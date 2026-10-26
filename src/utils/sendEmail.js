@@ -303,8 +303,6 @@ const sendEmailforSuccesfullPayment = async (userEmail, paymentDetails = {}) => 
             order_number,
         } = paymentDetails;
 
-        console.log(paymentDetails)
-
         const response = await brevo.transactionalEmails.sendTransacEmail({
             sender: {
                 email: process.env.BREVO_SENDER_EMAIL,
@@ -338,4 +336,26 @@ const sendEmailforSuccesfullPayment = async (userEmail, paymentDetails = {}) => 
     }
 };
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment };
+const sendEmailOnOrderConfirmed = async (userEmail, params = {}) => {
+    try {
+        const response = await brevo.transactionalEmails.sendTransacEmail({
+            sender: {
+                email: process.env.BREVO_SENDER_EMAIL,
+                name: process.env.BREVO_SENDER_NAME,
+            },
+            to: [{ email: userEmail, name: params.customer_name }],
+            templateId: Number(process.env.BREVO_ORDER_CONFIRMATION_TEMPLATE_ID),
+            params,
+        });
+
+        console.log('✅ Order confirmed email sent:', response?.messageId || response);
+
+        return { success: true, data: response };
+    } catch (error) {
+        console.error('❌ Order confirmed email failed:', error?.message || error);
+
+        return { success: false, error: error?.message || 'Failed to send email' };
+    }
+};
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed };

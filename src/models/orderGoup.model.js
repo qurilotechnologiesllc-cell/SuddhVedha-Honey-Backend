@@ -191,6 +191,8 @@ const orderGroupSchema = new mongoose.Schema({
 
     payment_email_sent: { type: Boolean, default: false },
 
+    order_confirmed_email_sent: { type: Boolean, default: false }
+
 }, {
     timestamps: true
 });

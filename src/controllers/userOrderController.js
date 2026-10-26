@@ -21,7 +21,7 @@ const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/upload
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
-const sendPaymentSuccessEmail = require('../services/paymentEmail.service')
+const { sendPaymentSuccessEmail } = require('../services/emails.service')
 
 const generateOrderGroupId = () => {
 
