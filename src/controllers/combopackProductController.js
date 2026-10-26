@@ -1798,10 +1798,15 @@ const getRandomComboProducts = asyncHandler(async (req, res) => {
 });
 
 const getComboTwoThreeAndFourProducts = asyncHandler(async (req, res) => {
+    // Teeno sizes (2, 3, 4) ka ek-ek product parallel mein fetch karein
+    const [productSize2, productSize3, productSize4] = await Promise.all([
+        ComboProduct.findOne({ combo_size: 2 }).lean(),
+        ComboProduct.findOne({ combo_size: 3 }).lean(),
+        ComboProduct.findOne({ combo_size: 4 }).lean()
+    ]);
 
-    const comboProducts = await ComboProduct.find({
-        combo_size: { $in: [2, 3, 4] }
-    }).limit(3).lean();
+    // Sabhi ko ek array mein daalein aur agar koi size na mile toh filter out kar dein
+    const comboProducts = [productSize2, productSize3, productSize4].filter(Boolean);
 
     if (comboProducts.length === 0) {
         return res.status(200).json({
