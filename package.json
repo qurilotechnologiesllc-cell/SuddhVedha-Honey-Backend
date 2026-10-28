@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "worker": "node workers/email.worker.js",
+    "dev": "concurrently -n API,WORKER -c blue,green \"nodemon index.js\" \"nodemon workers/email.worker.js\""
   },
   "keywords": [],
   "author": "",
@@ -15,6 +17,7 @@
     "@getbrevo/brevo": "^6.0.2",
     "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.5.0",
     "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -29,5 +32,8 @@
     "razorpay": "^2.9.8",
     "socket.io": "^4.8.3",
     "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
   }
 }

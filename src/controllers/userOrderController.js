@@ -21,7 +21,7 @@ const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/upload
 
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
-const { sendPaymentSuccessEmail } = require('../services/emails.service')
+const { enqueuePaymentEmail } = require('../queues/email.queue')
 
 const generateOrderGroupId = () => {
 
@@ -1776,9 +1776,12 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 `Payment captured: ${orderGroup.group_id}`
             );
 
-            sendPaymentSuccessEmail(orderGroup, payment).catch((err) =>
-                console.error('Payment email failed:', err.message)
-            );
+            // Ab: queue mein daalo
+            try {
+                await enqueuePaymentEmail(orderGroup._id, payment.created_at);
+            } catch (err) {
+                console.error('Failed to enqueue payment email:', err.message);
+            }
 
             break;
         }

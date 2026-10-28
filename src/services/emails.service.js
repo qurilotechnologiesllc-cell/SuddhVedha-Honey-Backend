@@ -1,3 +1,4 @@
+const { UnrecoverableError } = require('bullmq')
 const User = require('../models/user.model');           // apna path/model name adjust karo
 const Order = require('../models/orders.model');
 const Ordergroup = require('../models/orderGoup.model'); // apna path adjust karo
@@ -70,55 +71,48 @@ const buildEmailItems = (orders) =>
     );
 
 
-const sendPaymentSuccessEmail = async (orderGroup, payment) => {
-    // Atomic claim: sirf ek hi webhook email bhej payega (duplicate se bachne ke liye)
-    const claimed = await Ordergroup.findOneAndUpdate(
-        { _id: orderGroup._id, payment_email_sent: { $ne: true } },
-        { $set: { payment_email_sent: true } }
-    );
+const sendPaymentSuccessEmail = async (orderGroupId, paymentCreatedAt) => {
+    const orderGroup = await Ordergroup.findById(orderGroupId).lean();
 
-    if (!claimed) {
+    // Retry se fayda nahi, seedha fail karo
+    if (!orderGroup) throw new UnrecoverableError(`OrderGroup not found: ${orderGroupId}`);
+
+    // Pehle se bhej diya ho to skip (duplicate protection)
+    if (orderGroup.payment_email_sent) {
         console.log(`Payment email already sent: ${orderGroup.group_id}`);
         return;
     }
 
-    try {
-        const user = await User.findById(orderGroup.userId)
-            .select('email name fullName firstName lastName')
-            .lean();
+    const user = await User.findById(orderGroup.userId)
+        .select('email name')
+        .lean();
 
-        if (!user?.email) {
-            throw new Error(`User email not found for group ${orderGroup.group_id}`);
-        }
-
-        const customerName = user.name
-
-        const paymentTimestamp = payment?.created_at
-            ? payment.created_at * 1000 // Razorpay unix seconds deta hai
-            : Date.now();
-
-        const result = await sendEmailforSuccesfullPayment(user.email, {
-            customer_name: customerName,
-            order_number: orderGroup.group_id,
-            transaction_amount: formatAmount(orderGroup.finalAmount),
-            transaction_id: payment?.id || orderGroup.payment?.razorpay_payment_id,
-            payment_method: formatMethod(payment?.method || orderGroup.payment?.method),
-            order_date: formatDate(orderGroup.createdAt),
-            payment_date: formatDate(paymentTimestamp)
-        });
-
-        if (!result.success) {
-            throw new Error(result.error);
-        }
-    } catch (error) {
-        // Fail hua to flag reset karo, taaki baad mein dobara try ho sake
-        await Ordergroup.updateOne(
-            { _id: orderGroup._id },
-            { $set: { payment_email_sent: false } }
-        );
-
-        console.error('❌ Payment success email error:', error.message);
+    if (!user?.email) {
+        throw new UnrecoverableError(`User email not found for group ${orderGroup.group_id}`);
     }
+
+    const paymentTimestamp = paymentCreatedAt
+        ? paymentCreatedAt * 1000          // Razorpay unix seconds deta hai
+        : Date.now();
+
+    const result = await sendEmailforSuccesfullPayment(user.email, {
+        customer_name: user.name,
+        order_number: orderGroup.group_id,
+        transaction_amount: formatAmount(orderGroup.finalAmount),
+        transaction_id: orderGroup.payment?.razorpay_payment_id,
+        payment_method: formatMethod(orderGroup.payment?.method || orderGroup.payment_mode),
+        order_date: formatDate(orderGroup.createdAt),
+        payment_date: formatDate(paymentTimestamp),
+    });
+
+    // Fail hua to throw karo, BullMQ backoff ke saath dobara try karega
+    if (!result.success) throw new Error(result.error);
+
+    // Sirf success ke baad flag set karo
+    await Ordergroup.updateOne(
+        { _id: orderGroupId },
+        { $set: { payment_email_sent: true } }
+    );
 };
 
 const sendOrderConfirmedEmailByGroup = async (orderGroupId) => {
