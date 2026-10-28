@@ -6,8 +6,6 @@ const updatePaymentStatusInOrdergroupAndOrder = async ({
     paymentStatus,
     paymentData
 }) => {
-
-    console.log(paymentData)
     /*
     |--------------------------------------------------------------------------
     | 1. Update OrderGroup

@@ -905,18 +905,6 @@ const createOrderByUser = asyncHandler(async (req, res) => {
 
         /*
         |--------------------------------------------------------------------------
-        | Remove Item From Cart
-        |--------------------------------------------------------------------------
-        */
-
-        await removeOrderedItemsFromCart(
-            user._id,
-            [item]
-        );
-
-
-        /*
-        |--------------------------------------------------------------------------
         | Update / Reserve Stock
         |--------------------------------------------------------------------------
         */
@@ -1624,11 +1612,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
         case "payment.captured": {
 
-            const payment =
-                webhookData
-                    ?.payload
-                    ?.payment
-                    ?.entity;
+            const payment = webhookData?.payload?.payment?.entity;
 
 
             if (!payment) {
@@ -1642,8 +1626,7 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             |--------------------------------------------------------------------------
             */
 
-            const razorpayOrderId =
-                payment.order_id;
+            const razorpayOrderId = payment.order_id;
 
 
             const orderGroup =
@@ -1771,10 +1754,26 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
             });
 
+            try {
+                // Find all orders belonging to this order group
+                const orders = await Order.find({
+                    order_group_id: orderGroup._id
+                }).select("userId items");
 
-            console.log(
-                `Payment captured: ${orderGroup.group_id}`
-            );
+                // Remove the ordered cart items for each order
+                for (const order of orders) {
+                    await removeOrderedItemsFromCart(
+                        order.userId,
+                        order.items
+                    );
+                }
+
+            } catch (err) {
+                console.error(
+                    "Failed to remove ordered items from cart:",
+                    err.message
+                );
+            }
 
             // Ab: queue mein daalo
             try {
