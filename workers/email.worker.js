@@ -3,6 +3,8 @@ const { Worker } = require('bullmq');
 const connectDB = require('../src/config/database');                       // apna DB connect function
 const { connection, EMAIL_QUEUE_NAME } = require('../src/queues/email.queue');
 const { sendPaymentSuccessEmail } = require('../src/services/emails.service');
+const { BULK_EMAIL_QUEUE_NAME } = require('../src/queues/bulkEmail.queue');
+const { processSubscriberEmailJob } = require('../src/services/subscriberCampaign.service');
 
 const start = async () => {
     await connectDB();
@@ -37,6 +39,22 @@ const start = async () => {
         );
         // Final failure pe yahan Slack/Sentry alert laga sakte ho
     });
+
+    const bulkWorker = new Worker(
+        BULK_EMAIL_QUEUE_NAME,
+        async (job) => {
+            if (job.name === 'subscriber-launch') return processSubscriberEmailJob(job);
+        },
+        {
+            connection,
+            concurrency: 5,
+            limiter: { max: 10, duration: 1000 },   // Brevo plan ke hisaab se
+        }
+    );
+
+    bulkWorker.on('failed', (job, err) =>
+        console.error(`❌ Bulk email failed (${job?.attemptsMade}/${job?.opts?.attempts}) ${job?.id}: ${err.message}`)
+    );
 
     // Deploy ya restart pe chal rahe jobs poore hone do
     const shutdown = async () => {

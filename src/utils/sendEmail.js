@@ -380,4 +380,26 @@ const sendEmailOnCancelledOrder = async (userEmail, params = {}) => {
     }
 }
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed, sendEmailOnCancelledOrder };
+const sendEmailForSubscribers = async (userEmail, params = {}) => {
+    try {
+        const { launch_date, time } = params;
+
+        const response = await brevo.transactionalEmails.sendTransacEmail({
+            sender: {
+                email: process.env.BREVO_SENDER_EMAIL,
+                name: process.env.BREVO_SENDER_NAME,
+            },
+            to: [{ email: userEmail }],
+            templateId: Number(process.env.BREVO_SUBSCRIBER_TEMPLATE_ID),
+            params: { launch_date, time },
+        });
+
+        console.log('✅ Subscriber email sent:', response?.messageId || response);
+        return { success: true, data: response };
+    } catch (error) {
+        console.error('❌ Subscriber email failed:', error?.message || error);
+        return { success: false, error: error?.message || 'Failed to send email' };
+    }
+};
+
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed, sendEmailOnCancelledOrder, sendEmailForSubscribers };

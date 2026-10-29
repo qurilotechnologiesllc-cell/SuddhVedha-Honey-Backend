@@ -1,6 +1,8 @@
 const SubscribeSchema = require('../models/subscribe.model')
 const { asyncHandler, BadRequestError, ConflictError } = require('../errors/errorConfig')
 const { sendWelcomeEmail } = require('../utils/sendEmail')
+const { EmailCampaign } = require('../models/emailCampaign.model');
+const { startSubscriberCampaign, resumeSubscriberCampaign } = require('../services/subscriberCampaign.service');
 
 const EMAIL_REGEX =
     /^(?!.*\.\.)[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/
@@ -198,5 +200,36 @@ const getDetailedSubscribers = asyncHandler(async (req, res) => {
     })
 })
 
+const triggerSubscriberEmail = asyncHandler(async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Only admin allowed' });
+    }
 
-module.exports = { SubmitDetails, getEmailOnlySubscribers, getDetailedSubscribers }
+    const { launch_date, time = "" } = req.body;
+
+    if (!launch_date) {
+        return res.status(400).json({ success: false, message: 'launch_date required' });
+    }
+
+    const campaign = await startSubscriberCampaign({
+        launch_date,
+        time,
+        createdBy: req.user.id,
+    });
+
+    // 202: kaam queue mein chala gaya, email baad mein jayenge
+    return res.status(202).json({
+        success: true,
+        message: 'Emails queued',
+        data: { campaignId: campaign._id, total: campaign.total },
+    });
+});
+
+const resumeCampaign = asyncHandler(async (req, res) => {
+    await resumeSubscriberCampaign(req.params.id);
+    return res.json({ success: true, message: 'Pending and failed emails re-queued' });
+});
+
+
+
+module.exports = { SubmitDetails, getEmailOnlySubscribers, getDetailedSubscribers, triggerSubscriberEmail, resumeCampaign }
