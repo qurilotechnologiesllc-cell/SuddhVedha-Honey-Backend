@@ -27,7 +27,7 @@ const sendThankYouEmail = async (userEmail, userName) => {
 
                 ],
 
-                templateId: Number(process.env.BREVO_TEMPLATE_ID),
+                templateId: Number(process.env.BREVO_THANKU_TEMPLATE_ID),
 
                 params: {
 
@@ -91,81 +91,13 @@ const sendEmailforOtp = async (adminEmail, fullname, otp) => {
 
                 ],
 
-                templateId: Number(process.env.BREVO__OTP_TEMPLATE_ID),
+                templateId: Number(process.env.BREVO_ADMIN_OTP_TEMPLATE_ID),
 
                 params: {
 
                     admin_name: fullname,
 
                     otp: otp
-                }
-
-            });
-
-        console.log("✅ Email Sent", response);
-
-        return {
-
-            success: true,
-
-            data: response
-
-        };
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-        return {
-
-            success: false,
-
-            error: error.message
-
-        };
-
-    }
-}
-
-const sendupdateEnquiryEmail = async (userinfo) => {
-
-    const { userEmail, fullname, message, status } = userinfo
-    try {
-
-        const response =
-            await brevo.transactionalEmails.sendTransacEmail({
-
-                sender: {
-
-                    email: process.env.BREVO_SENDER_EMAIL,
-
-                    name: process.env.BREVO_SENDER_NAME
-
-                },
-
-                to: [
-
-                    {
-
-                        email: userEmail,
-
-                        name: fullname
-
-                    }
-
-                ],
-
-                templateId: Number(process.env.BREVO__ENQUIRY_TEMPLATE_ID),
-
-                params: {
-
-                    userName: fullname,
-
-                    message: message,
-
-                    status: status
                 }
 
             });
@@ -225,7 +157,7 @@ const sendnotificationEmailToUser = async (userInfo, orderdetails) => {
 
                 ],
 
-                templateId: Number(process.env.BREVO_ORDER_CONFIRMATION_TEMPLATE_ID),
+                templateId: Number(process.env.BREVO_PLAN_ORDER_CONFIRMATION_TEMPLATE_ID),
 
                 params: {
                     customerName,
@@ -278,7 +210,7 @@ const sendWelcomeEmail = async (userEmail) => {
                 name: process.env.BREVO_SENDER_NAME,
             },
             to: [{ email: userEmail }],
-            templateId: Number(process.env.BREVO_WELCOME_TEMPLATE_ID),
+            templateId: Number(process.env.BREVO_SUBSCRIBE_WELCOME_EMAIL_TEMPLATE_ID),
         });
 
         console.log('✅ Welcome email sent:', response?.messageId || response);
@@ -344,7 +276,7 @@ const sendEmailOnOrderConfirmed = async (userEmail, params = {}) => {
                 name: process.env.BREVO_SENDER_NAME,
             },
             to: [{ email: userEmail, name: params.customer_name }],
-            templateId: Number(process.env.BREVO_ORDER_CONFIRMATION_TEMPLATE_ID),
+            templateId: Number(process.env.BREVO_ADMIN_ORDER_CONFIRMATION_TEMPLATE_ID),
             params,
         });
 
@@ -366,7 +298,7 @@ const sendEmailOnCancelledOrder = async (userEmail, params = {}) => {
                 name: process.env.BREVO_SENDER_NAME,
             },
             to: [{ email: userEmail, name: params.customer_name }],
-            templateId: Number(process.env.BREVO_ORDER_CANCELLED_TEMPLATE_ID),
+            templateId: Number(process.env.BREVO_USER_ORDER_CANCELLED_TEMPLATE_ID),
             params,
         });
 
@@ -380,26 +312,23 @@ const sendEmailOnCancelledOrder = async (userEmail, params = {}) => {
     }
 }
 
-const sendEmailForSubscribers = async (userEmail, params = {}) => {
+const sendTemplateEmail = async (userEmail, templateId, params = {}) => {
     try {
-        const { launch_date, time } = params;
-
         const response = await brevo.transactionalEmails.sendTransacEmail({
             sender: {
                 email: process.env.BREVO_SENDER_EMAIL,
                 name: process.env.BREVO_SENDER_NAME,
             },
             to: [{ email: userEmail }],
-            templateId: Number(process.env.BREVO_SUBSCRIBER_TEMPLATE_ID),
-            params: { launch_date, time },
+            templateId: Number(templateId),
+            params,
         });
-
-        console.log('✅ Subscriber email sent:', response?.messageId || response);
+        console.log('✅ email sent:', response?.messageId || response);
         return { success: true, data: response };
     } catch (error) {
-        console.error('❌ Subscriber email failed:', error?.message || error);
+        console.error('❌ Template email failed:', error?.message || error);
         return { success: false, error: error?.message || 'Failed to send email' };
     }
 };
 
-module.exports = { sendThankYouEmail, sendEmailforOtp, sendupdateEnquiryEmail, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed, sendEmailOnCancelledOrder, sendEmailForSubscribers };
+module.exports = { sendThankYouEmail, sendEmailforOtp, sendnotificationEmailToUser, sendWelcomeEmail, sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed, sendEmailOnCancelledOrder, sendTemplateEmail };

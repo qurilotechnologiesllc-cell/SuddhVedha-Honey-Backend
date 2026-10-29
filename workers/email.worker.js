@@ -4,7 +4,7 @@ const connectDB = require('../src/config/database');                       // ap
 const { connection, EMAIL_QUEUE_NAME } = require('../src/queues/email.queue');
 const { sendPaymentSuccessEmail } = require('../src/services/emails.service');
 const { BULK_EMAIL_QUEUE_NAME } = require('../src/queues/bulkEmail.queue');
-const { processSubscriberEmailJob } = require('../src/services/subscriberCampaign.service');
+const { processCampaignJob } = require('../src/services/subscriberCampaign.service');
 
 const start = async () => {
     await connectDB();
@@ -43,13 +43,10 @@ const start = async () => {
     const bulkWorker = new Worker(
         BULK_EMAIL_QUEUE_NAME,
         async (job) => {
-            if (job.name === 'subscriber-launch') return processSubscriberEmailJob(job);
+            if (job.name === 'bulk-campaign') return processCampaignJob(job);
+            throw new Error(`Unknown bulk email job: ${job.name}`);
         },
-        {
-            connection,
-            concurrency: 5,
-            limiter: { max: 10, duration: 1000 },   // Brevo plan ke hisaab se
-        }
+        { connection, concurrency: 5, limiter: { max: 10, duration: 1000 } }
     );
 
     bulkWorker.on('failed', (job, err) =>

@@ -1,11 +1,17 @@
 const Subscriber = require('../models/subscribe.model');
+const CAMPAIGN_TYPES = require('../config/campaignTypes');
 const { EmailCampaign, EmailCampaignRecipient } = require('../models/emailCampaign.model');
 const { bulkEmailQueue } = require('../queues/bulkEmail.queue');
-const { sendEmailForSubscribers } = require('../utils/sendEmail');
+const { sendTemplateEmail } = require('../utils/sendEmail');
 
 const BATCH_SIZE = 500;
 
-/* Pending recipients ko queue mein daalo (jobId ki wajah se duplicate nahi banega) */
+const httpError = (statusCode, message) => {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    return err;
+};
+
 const enqueuePendingRecipients = async (campaignId) => {
     let lastId = null;
 
@@ -23,9 +29,9 @@ const enqueuePendingRecipients = async (campaignId) => {
 
         await bulkEmailQueue.addBulk(
             batch.map((r) => ({
-                name: 'subscriber-launch',
+                name: 'bulk-campaign',                                    // worker se match karna chahiye
                 data: { campaignId: String(campaignId), recipientId: String(r._id) },
-                opts: { jobId: `subscriber-${campaignId}-${r._id}` },
+                opts: { jobId: `campaign-${campaignId}-${r._id}` },       // generic prefix
             }))
         );
 
@@ -34,39 +40,41 @@ const enqueuePendingRecipients = async (campaignId) => {
 };
 
 /* Campaign banao + recipients save karo + enqueue */
-const startSubscriberCampaign = async ({ launch_date, time = "", createdBy }) => {
-    const running = await EmailCampaign.findOne({ type: 'subscriber-launch', status: 'running' }).lean();
-    if (running) {
-        const err = new Error('Ek campaign pehle se chal raha hai');
-        err.statusCode = 409;
-        throw err;
-    }
+const startCampaign = async ({ type, params = {}, createdBy, resend = false }) => {
+    const config = CAMPAIGN_TYPES[type];
+    if (!config) throw httpError(400, `Invalid campaign type: ${type}`);
 
-    // Unique, valid emails
-    const subscribers = await Subscriber.find({ email: { $exists: true, $ne: '' } })
-        .select('email')
-        .lean();
+    const missing = config.requiredParams.filter((k) => !params[k]);
+    if (missing.length) throw httpError(400, `Missing params: ${missing.join(', ')}`);
 
+    const running = await EmailCampaign.findOne({ type, status: 'running' }).lean();
+    if (running) throw httpError(409, 'Is type ka campaign pehle se chal raha hai');
+
+    // Valid aur unique emails
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const emails = [
-        ...new Set(subscribers.map((s) => String(s.email).trim().toLowerCase()).filter((e) => emailRegex.test(e))),
+    const audience = await config.getAudience();
+    let emails = [
+        ...new Set(audience.map((e) => String(e).trim().toLowerCase()).filter((e) => emailRegex.test(e))),
     ];
 
-    if (!emails.length) {
-        const err = new Error('Koi subscriber nahi mila');
-        err.statusCode = 400;
-        throw err;
+    // Jinko is type ka email pehle ja chuka hai, unko hatao
+    if (!resend) {
+        const alreadySent = new Set(await EmailCampaignRecipient.distinct('email', { type, status: 'sent' }));
+        emails = emails.filter((e) => !alreadySent.has(e));
     }
 
+    if (!emails.length) throw httpError(400, 'Koi naya recipient nahi hai, sabko pehle hi email ja chuka hai');
+
     const campaign = await EmailCampaign.create({
-        launch_date,
-        time,
+        type,
+        templateId: config.templateId(),
+        params,
         total: emails.length,
         createdBy,
     });
 
     await EmailCampaignRecipient.insertMany(
-        emails.map((email) => ({ campaignId: campaign._id, email })),
+        emails.map((email) => ({ campaignId: campaign._id, type, email })),
         { ordered: false }
     );
 
@@ -93,7 +101,7 @@ const bumpCounter = async (campaignId, field) => {
 };
 
 /* Worker is function ko chalata hai (ek job = ek email) */
-const processSubscriberEmailJob = async (job) => {
+const processCampaignJob = async (job) => {
     const { campaignId, recipientId } = job.data;
 
     const recipient = await EmailCampaignRecipient.findById(recipientId);
@@ -102,10 +110,7 @@ const processSubscriberEmailJob = async (job) => {
     const campaign = await EmailCampaign.findById(campaignId).lean();
     if (!campaign) return;
 
-    const result = await sendEmailForSubscribers(recipient.email, {
-        launch_date: campaign.launch_date,
-        time: campaign.time
-    });
+    const result = await sendTemplateEmail(recipient.email, campaign.templateId, campaign.params);
 
     if (result.success) {
         await EmailCampaignRecipient.updateOne(
@@ -119,7 +124,6 @@ const processSubscriberEmailJob = async (job) => {
         return;
     }
 
-    // Fail hua
     const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts || 1);
 
     await EmailCampaignRecipient.updateOne(
@@ -135,6 +139,7 @@ const processSubscriberEmailJob = async (job) => {
     throw new Error(result.error);   // BullMQ retry karega
 };
 
+
 /* Failed + pending ko dobara chalao */
 const resumeSubscriberCampaign = async (campaignId) => {
     await EmailCampaignRecipient.updateMany({ campaignId, status: 'failed' }, { $set: { status: 'pending' } });
@@ -149,4 +154,4 @@ const resumeSubscriberCampaign = async (campaignId) => {
     await enqueuePendingRecipients(campaignId);
 };
 
-module.exports = { startSubscriberCampaign, processSubscriberEmailJob, resumeSubscriberCampaign };
+module.exports = { startCampaign, processCampaignJob, resumeSubscriberCampaign };

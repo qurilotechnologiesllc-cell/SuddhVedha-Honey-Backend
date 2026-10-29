@@ -2,11 +2,9 @@ const mongoose = require('mongoose');
 
 const campaignSchema = new mongoose.Schema(
     {
-        type: { type: String, default: 'subscriber-launch' },
-        launch_date: { type: String, required: true },
-        time: {
-            type: String, default: "", trim: true,
-        },
+        type: { type: String, required: true, index: true },
+        templateId: { type: Number, required: true },
+        params: { type: mongoose.Schema.Types.Mixed, default: {} },
         total: { type: Number, default: 0 },
         sent: { type: Number, default: 0 },
         failed: { type: Number, default: 0 },
@@ -25,6 +23,7 @@ const campaignSchema = new mongoose.Schema(
 const recipientSchema = new mongoose.Schema(
     {
         campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'EmailCampaign', index: true },
+        type: { type: String, required: true },
         email: { type: String, required: true, lowercase: true, trim: true },
         status: { type: String, enum: ['pending', 'sent', 'failed'], default: 'pending', index: true },
         attempts: { type: Number, default: 0 },
@@ -37,6 +36,7 @@ const recipientSchema = new mongoose.Schema(
 
 // Ek campaign mein ek email sirf ek baar
 recipientSchema.index({ campaignId: 1, email: 1 }, { unique: true });
+recipientSchema.index({ type: 1, status: 1, email: 1 });
 
 module.exports = {
     EmailCampaign: mongoose.model('EmailCampaign', campaignSchema),
