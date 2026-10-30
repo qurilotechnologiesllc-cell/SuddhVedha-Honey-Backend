@@ -103,21 +103,22 @@ const createProduct = asyncHandler(async (req, res) => {
 
 const getAllProducts = asyncHandler(async (req, res) => {
 
-    // 1. Pehle Redis check karo
-    try {
-        const cached = await redis.get(PRODUCTS_CACHE_KEY);
-        if (cached) {
-            res.set('X-Cache', 'HIT');
-            // cached already JSON string hai, parse/stringify dobara nahi karna -> fast
-            return res
-                .status(200)
-                .type('application/json')
-                .send(`{"success":true,"data":${cached}}`);
-        }
-    } catch (err) {
-        // Redis down ho to bhi API chalni chahiye, DB se data dena hai
-        console.error('Redis get failed:', err.message);
-    }
+    // // 1. Pehle Redis check karo
+    // try {
+    //     const cached = await redis.get(PRODUCTS_CACHE_KEY);
+    //     console.log("redis ka data lega")
+    //     if (cached) {
+    //         res.set('X-Cache', 'HIT');
+    //         // cached already JSON string hai, parse/stringify dobara nahi karna -> fast
+    //         return res
+    //             .status(200)
+    //             .type('application/json')
+    //             .send(`{"success":true,"data":${cached}}`);
+    //     }
+    // } catch (err) {
+    //     // Redis down ho to bhi API chalni chahiye, DB se data dena hai
+    //     console.error('Redis get failed:', err.message);
+    // }
 
     // 2. Cache miss -> DB se data lo
     const products = await Product.find({ is_active: true })
@@ -147,18 +148,18 @@ const getAllProducts = asyncHandler(async (req, res) => {
     }));
 
     // 3. Redis me save karo (fail ho jaye to bhi response jayega)
-    try {
-        await redis.set(
-            PRODUCTS_CACHE_KEY,
-            JSON.stringify(formattedProducts),
-            'EX',
-            PRODUCTS_CACHE_TTL
-        );
-    } catch (err) {
-        console.error('Redis set failed:', err.message);
-    }
+    // try {
+    //     await redis.set(
+    //         PRODUCTS_CACHE_KEY,
+    //         JSON.stringify(formattedProducts),
+    //         'EX',
+    //         PRODUCTS_CACHE_TTL
+    //     );
+    // } catch (err) {
+    //     console.error('Redis set failed:', err.message);
+    // }
 
-    res.set('X-Cache', 'MISS');
+    // res.set('X-Cache', 'MISS');
     res.status(200).json({
         success: true,
         data: formattedProducts
