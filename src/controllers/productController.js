@@ -8,8 +8,8 @@ const cloudinary = require('../config/cloudinary')
 const redis = require('../utils/redis')
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/uploadToCloudinary')
 
-const PRODUCTS_CACHE_KEY = 'products:all:v1';
-const PRODUCTS_CACHE_TTL = 60 * 10; // 10 minutes (seconds me)
+// const PRODUCTS_CACHE_KEY = 'products:all:v1';
+// const PRODUCTS_CACHE_TTL = 60 * 10; // 10 minutes (seconds me)
 
 const { asyncHandler, BadRequestError, UnauthorizedError, NotFoundError, ForbiddenError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
