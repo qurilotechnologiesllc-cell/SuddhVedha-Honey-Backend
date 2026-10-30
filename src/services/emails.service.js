@@ -2,7 +2,7 @@ const { UnrecoverableError } = require('bullmq')
 const User = require('../models/user.model');           // apna path/model name adjust karo
 const Order = require('../models/orders.model');
 const Ordergroup = require('../models/orderGoup.model'); // apna path adjust karo
-const { sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed } = require('../utils/sendEmail');
+const { sendEmailforSuccesfullPayment, sendEmailOnOrderConfirmed, sendEmailOnCancelledOrder } = require('../utils/sendEmail');
 
 const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', {
     day: '2-digit',
@@ -184,5 +184,29 @@ const sendOrderConfirmedEmailByGroup = async (orderGroupId) => {
     }
 };
 
+const sendOrderCancelledEmail = async (orderId, razorpayRefundId) => {
+    const order = await Order.findById(orderId).lean();
+    if (!order) throw new Error(`Order not found: ${orderId}`);
 
-module.exports = { sendPaymentSuccessEmail, sendOrderConfirmedEmailByGroup };
+    const refund = (order.refunds || []).find(
+        (r) => r.razorpay_refund_id === razorpayRefundId
+    );
+    if (!refund) throw new Error(`Refund not found on order: ${razorpayRefundId}`);
+
+    const user = await User.findById(order.userId).select('email name').lean();
+    if (!user?.email) throw new Error(`User email not found for order ${order.order_id}`);
+
+    const result = await sendEmailOnCancelledOrder(user.email, {
+        customer_name: user.name,
+        order_id: order.order_id,
+        total_amount: formatAmount(refund.amount ?? order.totalAmount),
+        refund_method: formatMethod(order.payment_mode),
+    });
+
+    if (!result.success) throw new Error(result.error);
+
+    return result;
+};
+
+
+module.exports = { sendPaymentSuccessEmail, sendOrderConfirmedEmailByGroup, sendOrderCancelledEmail };

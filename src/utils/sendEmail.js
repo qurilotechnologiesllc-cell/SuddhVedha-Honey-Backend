@@ -297,12 +297,12 @@ const sendEmailOnCancelledOrder = async (userEmail, params = {}) => {
                 email: process.env.BREVO_SENDER_EMAIL,
                 name: process.env.BREVO_SENDER_NAME,
             },
-            to: [{ email: userEmail, name: params.customer_name }],
+            to: [{ email: userEmail, }],
             templateId: Number(process.env.BREVO_USER_ORDER_CANCELLED_TEMPLATE_ID),
             params,
         });
 
-        console.log('✅ Order confirmed email sent:', response?.messageId || response);
+        console.log('✅ Order cancel email sent:', response?.messageId || response);
 
         return { success: true, data: response };
     } catch (error) {

@@ -3,20 +3,14 @@ const Order = require("../models/orders.model");
 
 const updateOrderGroupRefundSummary = async (orderGroupId) => {
 
-    const orderGroup = await Ordergroup.findById(
-        orderGroupId
-    )
-        .select("finalAmount")
-        .lean();
+    const orderGroup = await Ordergroup.findById(orderGroupId).select("finalAmount").lean();
 
     if (!orderGroup) {
         return null;
     }
 
 
-    const orders = await Order.find({
-        order_group_id: orderGroupId
-    })
+    const orders = await Order.find({ order_group_id: orderGroupId })
         .select("_id refunds")
         .lean();
 
@@ -43,8 +37,7 @@ const updateOrderGroupRefundSummary = async (orderGroupId) => {
             // Processed refund
             if (refund.status === "processed") {
 
-                totalRefundedAmount +=
-                    Number(refund.amount || 0);
+                totalRefundedAmount += Number(refund.amount || 0);
 
                 refundCount += 1;
 
@@ -87,19 +80,13 @@ const updateOrderGroupRefundSummary = async (orderGroupId) => {
     let refundStatus = "none";
 
 
-    if (
-        totalRefundedAmount >=
-        Number(orderGroup.finalAmount)
-    ) {
+    if (totalRefundedAmount >= Number(orderGroup.finalAmount)) {
 
         refundStatus = "refunded";
 
-    } else if (
-        totalRefundedAmount > 0
-    ) {
+    } else if (totalRefundedAmount > 0) {
 
-        refundStatus =
-            "partially_refunded";
+        refundStatus = "partially_refunded";
 
     } else if (
         hasPendingRefund
@@ -131,13 +118,9 @@ const updateOrderGroupRefundSummary = async (orderGroupId) => {
                     refunded_order_count:
                         refundedOrderIds.size,
 
-                    refunded_order_ids:
-                        Array.from(
-                            refundedOrderIds
-                        ),
+                    refunded_order_ids: Array.from(refundedOrderIds),
 
-                    refund_status:
-                        refundStatus
+                    refund_status: refundStatus
                 }
             },
             {

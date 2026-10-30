@@ -22,6 +22,7 @@ const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/upload
 const { asyncHandler, BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError } = require('../errors/errorConfig')
 
 const { enqueuePaymentEmail } = require('../queues/email.queue')
+const { sendOrderCancelledEmail } = require('../services/emails.service')
 
 const generateOrderGroupId = () => {
 
@@ -78,6 +79,35 @@ const generateReturnId = () => {
         .toUpperCase();
 
     return `SR-${yyyy}${mm}${dd}-${random}`;
+};
+
+const releaseReservedStock = async (order) => {
+    let released = false;
+
+    await Promise.all(
+        order.items.map(async (item) => {
+            // COMBO mein inventory nahi hoti, CUSTOM intentionally removed
+            if (item.type !== "NORMAL") return;
+
+            const product = item.product_details?.product;
+            const productId = product?._id;
+            const variantId = product?.variant?._id;
+            const reservedQty = Number(item.reserved_quantity || 0);
+
+            if (!productId || !variantId || reservedQty <= 0) return;
+
+            await ProductVariant.updateOne(
+                { product: productId, "variants._id": variantId },
+                { $inc: { "variants.$[v].available_stock": reservedQty } },
+                { arrayFilters: [{ "v._id": variantId }] }
+            );
+
+            item.reserved_quantity = 0;
+            released = true;
+        })
+    );
+
+    if (released) order.inventory_status = "released";
 };
 
 const createOrderByUser = asyncHandler(async (req, res) => {
@@ -2127,29 +2157,23 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
         case "refund.processed": {
 
-            const refund =
-                webhookData
-                    ?.payload
-                    ?.refund
-                    ?.entity;
+            const refund = webhookData
+                ?.payload
+                ?.refund
+                ?.entity;
 
+
+            console.log(refund)
 
             if (!refund) {
                 break;
             }
 
 
-            console.log(
-                "Refund processed:",
-                refund.id
-            );
-
-
-            const order =
-                await Order.findOne({
-                    "refunds.razorpay_refund_id":
-                        refund.id
-                });
+            const order = await Order.findOne({
+                "refunds.razorpay_refund_id":
+                    refund.id
+            });
 
 
             if (!order) {
@@ -2163,12 +2187,10 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            const refundIndex =
-                order.refunds.findIndex(
-                    item =>
-                        item.razorpay_refund_id ===
-                        refund.id
-                );
+            const refundIndex = order.refunds.findIndex(item =>
+                item.razorpay_refund_id ===
+                refund.id
+            );
 
 
             if (refundIndex === -1) {
@@ -2180,17 +2202,14 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             // Check duplicate webhook
             // ─────────────────────────────────────────
 
-            const alreadyProcessed =
-                order.refunds[refundIndex].status ===
-                "processed";
+            const alreadyProcessed = order.refunds[refundIndex].status === "processed";
 
 
             // ─────────────────────────────────────────
             // Update refund
             // ─────────────────────────────────────────
 
-            order.refunds[refundIndex].status =
-                "processed";
+            order.refunds[refundIndex].status = "processed";
 
             order.refunds[refundIndex].amount =
                 refund.amount / 100;
@@ -2229,11 +2248,9 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
                 order.order_group_id
             );
 
-
             console.log(
                 `Refund processed for order: ${order.order_id}`
             );
-
 
             break;
         }
@@ -2355,12 +2372,10 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
             }
 
 
-            const refundIndex =
-                order.refunds.findIndex(
-                    item =>
-                        item.razorpay_refund_id ===
-                        refund.id
-                );
+            const refundIndex = order.refunds.findIndex(item =>
+                item.razorpay_refund_id ===
+                refund.id
+            );
 
 
             if (refundIndex === -1) {
@@ -2402,11 +2417,6 @@ const razorpayWebhooks = asyncHandler(async (req, res) => {
 
             break;
         }
-        /*
-        |--------------------------------------------------------------------------
-        | UNKNOWN EVENT
-        |--------------------------------------------------------------------------
-        */
 
         default: {
 
@@ -2438,442 +2448,188 @@ const cancelSingleOrderByUser = asyncHandler(async (req, res) => {
 
     const userId = req.user.id;
     const { orderId } = req.params;
-    // ─────────────────────────────────────────
+    const { reason } = req.body
+
     // 1. FIND ORDER
-    // ─────────────────────────────────────────
+    const order = await Order.findOne({ _id: orderId, userId }).exec();
+    if (!order) throw new NotFoundError("Order not found.");
 
-    const order = await Order.findOne({
-        _id: orderId,
-        userId
-    }).exec();
-
-    if (!order) {
-        throw new NotFoundError("Order not found.");
-    }
-
-
-    // ─────────────────────────────────────────
-    // 2. CHECK ORDER STATUS
-    // ─────────────────────────────────────────
-
+    // 2. CHECK STATUS
     if (!CANCELLABLE_STATUSES.includes(order.order_status)) {
         throw new BadRequestError(
             `Order cannot be cancelled. Current status: ${order.order_status}`
         );
     }
 
-
-    // ─────────────────────────────────────────
     // 3. FIND ORDER GROUP
-    // ─────────────────────────────────────────
+    const orderGroup = await Ordergroup.findById(order.order_group_id).exec();
+    if (!orderGroup) throw new NotFoundError("Order group not found.");
 
-    const orderGroup = await Ordergroup
-        .findById(order.order_group_id)
-        .exec();
+    // 4. ATOMIC CLAIM (double-click / duplicate request se bachav)
+    const previousStatus = order.order_status;
 
-    if (!orderGroup) {
-        throw new NotFoundError(
-            "Order group not found."
+    const claim = await Order.updateOne(
+        { _id: order._id, order_status: previousStatus },
+        { $set: { order_status: "cancelled" } }
+    );
+
+    if (claim.modifiedCount !== 1) {
+        throw new BadRequestError("Order is already cancelled or being cancelled.");
+    }
+
+    // 5. PAYMENT + STOCK
+    let refundResult = null;
+
+    try {
+
+        // ═══════════ COD ═══════════
+        if (orderGroup.payment_mode === "cod") {
+
+            await releaseReservedStock(order);
+
+            order.order_status = "cancelled";
+            order.payment_status = "pending";   // COD payment abhi hua hi nahi
+            await order.save();
+
+            // Group amount recalculate (claim ki wajah se ye order already cancelled hai)
+            const remainingOrders = await Order.find({
+                order_group_id: orderGroup._id,
+                order_status: { $nin: ["cancelled", "refunded"] },
+            }).select("totalAmount").lean();
+
+            const newTotalAmount = remainingOrders.reduce(
+                (total, o) => total + Number(o.totalAmount || 0), 0
+            );
+
+            const oldTotalAmount = Number(orderGroup.totalAmount || 0);
+            const oldCodAmount = Number(orderGroup.cod_amount || 0);
+            const codPercentage = oldTotalAmount > 0 ? oldCodAmount / oldTotalAmount : 0;
+
+            const newCodAmount = Math.round(newTotalAmount * codPercentage);
+
+            orderGroup.totalAmount = newTotalAmount;
+            orderGroup.cod_amount = newCodAmount;
+            orderGroup.finalAmount = newTotalAmount + newCodAmount;
+
+            orderGroup.refund_status = "none";
+            orderGroup.total_refunded_amount = 0;
+            orderGroup.remaining_amount = 0;
+            orderGroup.refund_count = 0;
+            orderGroup.refunded_order_count = 0;
+            orderGroup.refunded_order_ids = [];
+
+            await orderGroup.save();
+
+            // ═══════════ ONLINE (payment hua hai) ═══════════
+        } else if (orderGroup.payment?.razorpay_payment_id) {
+
+            const refundAmount = Math.round(Number(order.totalAmount) * 100);
+
+            try {
+                refundResult = await razorpay.payments.refund(
+                    orderGroup.payment.razorpay_payment_id,
+                    {
+                        amount: refundAmount,
+                        speed: "normal",
+                        notes: {
+                            reason: "Order cancelled before shipment",
+                            order_id: String(order._id),
+                            order_number: order.order_id,
+                            group_id: String(orderGroup._id),
+                            group_number: orderGroup.group_id,
+                        },
+                    }
+                );
+            } catch (err) {
+                throw new BadRequestError(
+                    `Refund failed: ${err?.error?.description || err.message}`
+                );
+            }
+
+            // Refund successful, ab stock release karo
+            await releaseReservedStock(order);
+
+            order.refunds.push({
+                razorpay_refund_id: refundResult.id,
+                razorpay_payment_id: orderGroup.payment.razorpay_payment_id,
+                amount: refundResult.amount / 100,
+                currency: refundResult.currency || "INR",
+                status: refundResult.status,
+                reason: reason || "Order cancelled before shipment",
+                initiatedAt: new Date(),
+                processedAt: refundResult.status === "processed" ? new Date() : null,
+                acquirer_data: refundResult.acquirer_data || null,
+            });
+
+            order.payment_status = refundResult.status === "processed" ? "refunded" : "refund_pending";
+
+            order.order_status = "cancelled";
+
+            await order.save();
+
+            // ═══════════ ONLINE (payment hua hi nahi) ═══════════
+        } else {
+
+            await releaseReservedStock(order);
+
+            order.order_status = "cancelled";
+            await order.save();
+        }
+
+    } catch (error) {
+        // Refund hua hi nahi to status wapas purana kar do
+        // (refund ho chuka ho aur baad mein kuch fail hua, to rollback mat karo)
+        if (!refundResult) {
+            await Order.updateOne(
+                { _id: order._id },
+                { $set: { order_status: previousStatus } }
+            );
+        } else {
+            console.error(
+                `CRITICAL: refund ${refundResult.id} done but order save failed: ${order.order_id}`,
+                error.message
+            );
+        }
+
+        throw error;
+    }
+
+    // 6. REFUND KE BAAD KE KAAM (fail hone pe response nahi rukega)
+    if (refundResult) {
+
+        // Group refund summary (webhook race ki wajah se yahan se update karna zaroori hai)
+        try {
+            await updateOrderGroupRefundSummary(order.order_group_id);
+        } catch (err) {
+            console.error("Refund summary update failed:", err.message);
+        }
+
+        // ✉️ Cancel email (refund DB mein save ho chuka hai)
+        sendOrderCancelledEmail(order._id, refundResult.id).catch((err) =>
+            console.error("Order cancelled email failed:", err.message)
         );
     }
 
-
-    // ─────────────────────────────────────────
-    // 4. RELEASE RESERVED STOCK
-    // ─────────────────────────────────────────
-
-    let inventoryReleased = false;
-
-    await Promise.all(
-
-        order.items.map(async (item) => {
-
-            // ─────────────────────────────────────────
-            // NORMAL ORDER
-            // ─────────────────────────────────────────
-
-            if (item.type === "NORMAL") {
-
-                const product =
-                    item.product_details?.product;
-
-                const productId =
-                    product?._id;
-
-                const variantId =
-                    product?.variant?._id;
-
-                const reservedQty =
-                    Number(
-                        item.reserved_quantity || 0
-                    );
-
-
-                if (
-                    !productId ||
-                    !variantId ||
-                    reservedQty <= 0
-                ) {
-                    return;
-                }
-
-
-                await ProductVariant.updateOne(
-                    {
-                        product: productId,
-                        "variants._id": variantId
-                    },
-                    {
-                        $inc: {
-                            "variants.$[v].available_stock":
-                                reservedQty
-                        }
-                    },
-                    {
-                        arrayFilters: [
-                            {
-                                "v._id": variantId
-                            }
-                        ]
-                    }
-                );
-
-
-                // Reserved quantity release ho gayi
-                item.reserved_quantity = 0;
-
-                inventoryReleased = true;
-
-                return;
-            }
-
-
-            // ─────────────────────────────────────────
-            // COMBO ORDER
-            // ─────────────────────────────────────────
-
-            if (item.type === "COMBO") {
-
-                // Combo ke paas inventory/variant nahi hai.
-                // Isliye kuch bhi update nahi karna.
-                return;
-            }
-
-
-            // CUSTOM intentionally removed
-        })
-    );
-
-
-    if (inventoryReleased) {
-        order.inventory_status = "released";
-    }
-
-
-    // ─────────────────────────────────────────
-    // 5. COD / ONLINE PAYMENT
-    // ─────────────────────────────────────────
-
-    let refundResult = null;
-
-
-    // ═══════════════════════════════════════════
-    // COD ORDER
-    // ═══════════════════════════════════════════
-
-    if (orderGroup.payment_mode === "cod") {
-
-
-        // ---------------------------------------
-        // Cancel order first
-        // ---------------------------------------
-
-        order.order_status = "cancelled";
-
-        // COD payment abhi hua hi nahi hai
-        order.payment_status = "pending";
-
-
-        await order.save();
-
-
-        // ---------------------------------------
-        // Recalculate group amount
-        // ---------------------------------------
-
-        const remainingOrders =
-            await Order.find({
-                order_group_id:
-                    orderGroup._id,
-
-                order_status: {
-                    $nin: [
-                        "cancelled",
-                        "refunded"
-                    ]
-                }
-            })
-                .select("totalAmount")
-                .lean();
-
-
-        // ---------------------------------------
-        // Remaining products total
-        // ---------------------------------------
-
-        const newTotalAmount =
-            remainingOrders.reduce(
-                (total, remainingOrder) =>
-                    total +
-                    Number(
-                        remainingOrder.totalAmount || 0
-                    ),
-                0
-            );
-
-
-        // ---------------------------------------
-        // Calculate COD
-        //
-        // Existing COD percentage:
-        // 187 / 748 = 25%
-        // ---------------------------------------
-
-        const oldTotalAmount =
-            Number(
-                orderGroup.totalAmount || 0
-            );
-
-        const oldCodAmount =
-            Number(
-                orderGroup.cod_amount || 0
-            );
-
-
-        let codPercentage = 0;
-
-
-        if (oldTotalAmount > 0) {
-
-            codPercentage =
-                oldCodAmount /
-                oldTotalAmount;
-        }
-
-
-        // ---------------------------------------
-        // New COD amount
-        // ---------------------------------------
-
-        const newCodAmount =
-            Math.round(
-                newTotalAmount *
-                codPercentage
-            );
-
-
-        // ---------------------------------------
-        // New final amount
-        // ---------------------------------------
-
-        const newFinalAmount =
-            newTotalAmount +
-            newCodAmount;
-
-
-        // ---------------------------------------
-        // Update OrderGroup
-        // ---------------------------------------
-
-        orderGroup.totalAmount =
-            newTotalAmount;
-
-        orderGroup.cod_amount =
-            newCodAmount;
-
-        orderGroup.finalAmount =
-            newFinalAmount;
-
-
-        // COD order mein refund nahi hai
-        orderGroup.refund_status =
-            "none";
-
-        orderGroup.total_refunded_amount =
-            0;
-
-        orderGroup.remaining_amount =
-            0;
-
-        orderGroup.refund_count =
-            0;
-
-        orderGroup.refunded_order_count =
-            0;
-
-        orderGroup.refunded_order_ids =
-            [];
-
-
-        await orderGroup.save();
-
-
-        // ═══════════════════════════════════════════
-        // ONLINE PAYMENT
-        // ═══════════════════════════════════════════
-
-    } else if (orderGroup.payment?.razorpay_payment_id) {
-
-
-        // ---------------------------------------
-        // Refund only cancelled order amount
-        // ---------------------------------------
-
-        const refundAmount =
-            Number(order.totalAmount) * 100;
-
-
-        refundResult =
-            await razorpay.payments.refund(
-                orderGroup.payment.razorpay_payment_id,
-                {
-                    amount: refundAmount,
-
-                    speed: "normal",
-
-                    notes: {
-
-                        reason:
-                            "Order cancelled before shipment",
-
-                        order_id:
-                            String(order._id),
-
-                        order_number:
-                            order.order_id,
-
-                        group_id:
-                            String(orderGroup._id),
-
-                        group_number:
-                            orderGroup.group_id
-                    }
-                }
-            );
-
-
-        // ---------------------------------------
-        // Save refund transaction
-        // ---------------------------------------
-
-        order.refunds.push({
-
-            razorpay_refund_id:
-                refundResult.id,
-
-            razorpay_payment_id:
-                orderGroup.payment.razorpay_payment_id,
-
-            amount:
-                refundResult.amount / 100,
-
-            currency:
-                refundResult.currency || "INR",
-
-            status:
-                refundResult.status,
-
-            reason:
-                "Order cancelled before shipment",
-
-            initiatedAt:
-                new Date(),
-
-            processedAt:
-                refundResult.status === "processed"
-                    ? new Date()
-                    : null,
-
-            acquirer_data:
-                refundResult.acquirer_data || null
-        });
-
-
-        // ---------------------------------------
-        // Update payment status
-        // ---------------------------------------
-
-        if (
-            refundResult.status === "processed"
-        ) {
-
-            order.payment_status =
-                "refunded";
-
-        } else if (
-            refundResult.status === "pending"
-        ) {
-
-            order.payment_status =
-                "refund_pending";
-        }
-
-
-        // Order status always cancelled
-        order.order_status =
-            "cancelled";
-
-
-        await order.save();
-    }
-
-
-    // ─────────────────────────────────────────
-    // 6. RESPONSE
-    // ─────────────────────────────────────────
-
+    // 7. RESPONSE
     return res.status(200).json({
-
         success: true,
-
-        message:
-            "Order cancelled successfully",
-
+        message: "Order cancelled successfully",
         data: {
-
-            cancelled_order:
-                order.order_id,
-
-            payment_mode:
-                orderGroup.payment_mode,
-
-            refund:
-                refundResult
-                    ? {
-                        id:
-                            refundResult.id,
-
-                        amount:
-                            refundResult.amount / 100,
-
-                        status:
-                            refundResult.status
-                    }
-                    : null,
-
-            // Useful especially for COD
+            cancelled_order: order.order_id,
+            payment_mode: orderGroup.payment_mode,
+            refund: refundResult
+                ? {
+                    id: refundResult.id,
+                    amount: refundResult.amount / 100,
+                    status: refundResult.status,
+                }
+                : null,
             orderGroup: {
-
-                totalAmount:
-                    orderGroup.totalAmount,
-
-                cod_amount:
-                    orderGroup.cod_amount,
-
-                finalAmount:
-                    orderGroup.finalAmount
-            }
-        }
+                totalAmount: orderGroup.totalAmount,
+                cod_amount: orderGroup.cod_amount,
+                finalAmount: orderGroup.finalAmount,
+            },
+        },
     });
 });
 
